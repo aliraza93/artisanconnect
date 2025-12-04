@@ -4,6 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SupportWidget } from "@/components/chat/support-widget";
+import { AuthProvider } from "@/lib/auth-context";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import PostJob from "@/pages/post-job";
@@ -33,12 +34,14 @@ function Router() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Router />
-        {/* Global Support Widget - Visible on all client pages, hidden on admin for now (or could be handled by logic) */}
-        <SupportWidget />
-      </TooltipProvider>
+      <AuthProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Router />
+          {/* Global Support Widget - Visible on all client pages, hidden on admin for now (or could be handled by logic) */}
+          <SupportWidget />
+        </TooltipProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }

@@ -1,9 +1,13 @@
+import { useState } from "react";
 import { Layout } from "@/components/layout/layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle, ShieldCheck, Truck, Users, Star, ArrowRight, X } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
+import { useAuth } from "@/lib/auth-context";
+import { LoginModal } from "@/components/auth/login-modal";
+import { SignupModal } from "@/components/auth/signup-modal";
 
 // Import generated images
 import heroImage from "@assets/generated_images/homeowner_shaking_hands_with_a_professional_artisan.png";
@@ -11,6 +15,27 @@ import artisanImage from "@assets/generated_images/professional_electrician_work
 import logisticsImage from "@assets/generated_images/logistics_truck_on_the_road.png";
 
 export default function Home() {
+  const { user } = useAuth();
+  const [, setLocation] = useLocation();
+  const [showLogin, setShowLogin] = useState(false);
+  const [showSignup, setShowSignup] = useState(false);
+
+  const handlePostJob = () => {
+    if (user) {
+      setLocation('/post-job');
+    } else {
+      setShowSignup(true);
+    }
+  };
+
+  const handleJoinAsPro = () => {
+    if (user) {
+      setLocation('/dashboard');
+    } else {
+      setShowSignup(true);
+    }
+  };
+
   return (
     <Layout>
       {/* Hero Section */}
@@ -28,16 +53,23 @@ export default function Home() {
               Stop gambling with your home projects. We connect you with vetted South African artisans and logistics pros who get the job done right.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 pt-4">
-              <Link href="/post-job">
-                <Button size="lg" className="bg-secondary hover:bg-secondary/90 text-secondary-foreground font-bold text-lg px-8 h-14 rounded-full shadow-lg shadow-secondary/20 transform hover:-translate-y-1 transition-all">
-                  Post a Job for Free
-                </Button>
-              </Link>
-              <Link href="/find-work">
-                <Button variant="outline" size="lg" className="border-2 border-slate-200 hover:border-primary hover:text-primary font-bold text-lg px-8 h-14 rounded-full bg-white">
-                  Join as a Pro
-                </Button>
-              </Link>
+              <Button 
+                size="lg" 
+                onClick={handlePostJob}
+                className="bg-secondary hover:bg-secondary/90 text-secondary-foreground font-bold text-lg px-8 h-14 rounded-full shadow-lg shadow-secondary/20 transform hover:-translate-y-1 transition-all"
+                data-testid="button-post-job-hero"
+              >
+                Post a Job for Free
+              </Button>
+              <Button 
+                variant="outline" 
+                size="lg" 
+                onClick={handleJoinAsPro}
+                className="border-2 border-slate-200 hover:border-primary hover:text-primary font-bold text-lg px-8 h-14 rounded-full bg-white"
+                data-testid="button-join-pro-hero"
+              >
+                Join as a Pro
+              </Button>
             </div>
             <div className="flex items-center gap-4 pt-4 text-sm text-slate-500 font-medium">
               <div className="flex -space-x-2">
@@ -157,11 +189,13 @@ export default function Home() {
                 </div>
               </div>
 
-              <Link href="/register">
-                <Button className="bg-secondary hover:bg-secondary/90 text-secondary-foreground font-bold rounded-full px-8 py-6 text-lg mt-4">
-                  Get Started Now
-                </Button>
-              </Link>
+              <Button 
+                onClick={handlePostJob}
+                className="bg-secondary hover:bg-secondary/90 text-secondary-foreground font-bold rounded-full px-8 py-6 text-lg mt-4"
+                data-testid="button-get-started"
+              >
+                Get Started Now
+              </Button>
             </div>
             
             <div className="grid grid-cols-2 gap-4">
@@ -214,19 +248,44 @@ export default function Home() {
           <h2 className="text-3xl lg:text-5xl font-heading font-bold">Ready to get started?</h2>
           <p className="text-blue-100 text-lg max-w-2xl mx-auto">Join thousands of South Africans who trust ArtisanConnect for their home and business needs.</p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
-            <Link href="/post-job">
-              <Button size="lg" className="bg-secondary hover:bg-secondary/90 text-secondary-foreground font-bold text-lg px-10 h-16 rounded-full shadow-xl">
-                Post a Job
-              </Button>
-            </Link>
-            <Link href="/register">
-              <Button variant="outline" size="lg" className="border-2 border-white/30 hover:bg-white/10 text-white font-bold text-lg px-10 h-16 rounded-full bg-transparent">
-                Become a Pro
-              </Button>
-            </Link>
+            <Button 
+              size="lg" 
+              onClick={handlePostJob}
+              className="bg-secondary hover:bg-secondary/90 text-secondary-foreground font-bold text-lg px-10 h-16 rounded-full shadow-xl"
+              data-testid="button-post-job-cta"
+            >
+              Post a Job
+            </Button>
+            <Button 
+              variant="outline" 
+              size="lg" 
+              onClick={handleJoinAsPro}
+              className="border-2 border-white/30 hover:bg-white/10 text-white font-bold text-lg px-10 h-16 rounded-full bg-transparent"
+              data-testid="button-become-pro-cta"
+            >
+              Become a Pro
+            </Button>
           </div>
         </div>
       </section>
+
+      {/* Auth Modals */}
+      <LoginModal 
+        open={showLogin} 
+        onOpenChange={setShowLogin}
+        onSwitchToSignup={() => {
+          setShowLogin(false);
+          setShowSignup(true);
+        }}
+      />
+      <SignupModal 
+        open={showSignup} 
+        onOpenChange={setShowSignup}
+        onSwitchToLogin={() => {
+          setShowSignup(false);
+          setShowLogin(true);
+        }}
+      />
     </Layout>
   );
 }
