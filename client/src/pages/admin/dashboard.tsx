@@ -7,6 +7,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ChatInterface } from "@/components/chat/chat-interface";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   LayoutDashboard, 
   Users, 
@@ -16,14 +18,20 @@ import {
   Search, 
   Bell, 
   Settings,
-  LogOut
+  LogOut,
+  Wallet,
+  ArrowUpRight,
+  Download
 } from "lucide-react";
 import { useState } from "react";
 import { Link } from "wouter";
+import { useToast } from "@/hooks/use-toast";
 
 export default function AdminDashboard() {
+  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("overview");
   const [selectedChat, setSelectedChat] = useState<number | null>(null);
+  const [withdrawAmount, setWithdrawAmount] = useState("");
 
   // Mock Data
   const disputes = [
@@ -43,6 +51,22 @@ export default function AdminDashboard() {
     { id: 3, sender: "other", text: "That works. Please bring the invoice.", time: "10:36 AM" },
   ];
 
+  const transactions = [
+    { id: "TXN-1001", date: "2023-10-15", type: "Withdrawal", amount: 15000, status: "Completed", bank: "FNB **** 4552" },
+    { id: "TXN-1002", date: "2023-10-18", type: "Platform Fee", amount: 850, status: "Completed", job: "#JOB-8821" },
+    { id: "TXN-1003", date: "2023-10-20", type: "Platform Fee", amount: 1200, status: "Completed", job: "#JOB-8834" },
+    { id: "TXN-1004", date: "2023-10-22", type: "Withdrawal", amount: 5000, status: "Processing", bank: "FNB **** 4552" },
+  ];
+
+  const handleWithdraw = (e: React.FormEvent) => {
+    e.preventDefault();
+    toast({
+      title: "Withdrawal Initiated",
+      description: `Your request to withdraw R ${withdrawAmount} has been processed. Funds will reflect in 1-3 business days.`,
+    });
+    setWithdrawAmount("");
+  };
+
   return (
     <div className="min-h-screen bg-slate-100 flex font-sans">
       {/* Sidebar */}
@@ -61,6 +85,13 @@ export default function AdminDashboard() {
             onClick={() => setActiveTab("overview")}
           >
             <LayoutDashboard className="w-4 h-4" /> Overview
+          </Button>
+          <Button 
+            variant={activeTab === "financials" ? "secondary" : "ghost"} 
+            className="w-full justify-start gap-3"
+            onClick={() => setActiveTab("financials")}
+          >
+            <Wallet className="w-4 h-4" /> Financials & Payouts
           </Button>
           <Button 
             variant={activeTab === "users" ? "secondary" : "ghost"} 
@@ -162,6 +193,105 @@ export default function AdminDashboard() {
                     </CardContent>
                   </Card>
                </div>
+            </div>
+          )}
+
+          {activeTab === "financials" && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <Card className="md:col-span-2">
+                   <CardHeader>
+                     <CardTitle>Available Balance</CardTitle>
+                     <CardDescription>Platform revenue available for withdrawal</CardDescription>
+                   </CardHeader>
+                   <CardContent className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                     <div>
+                       <div className="text-4xl font-bold text-slate-900">R 42,850.00</div>
+                       <div className="text-sm text-slate-500 mt-1">Cleared funds ready for payout</div>
+                     </div>
+                     <div className="space-y-4 w-full md:w-auto">
+                        <form onSubmit={handleWithdraw} className="flex gap-2">
+                          <div className="flex-1 min-w-[150px]">
+                            <Input 
+                              placeholder="Amount" 
+                              type="number" 
+                              value={withdrawAmount}
+                              onChange={(e) => setWithdrawAmount(e.target.value)}
+                              required
+                            />
+                          </div>
+                          <Button type="submit" className="bg-green-600 hover:bg-green-700">
+                             Withdraw Funds
+                          </Button>
+                        </form>
+                        <div className="text-xs text-slate-400 flex items-center gap-1">
+                           <Wallet className="w-3 h-3" />
+                           <span>Payout to: FNB Business Account (**** 4552)</span>
+                        </div>
+                     </div>
+                   </CardContent>
+                </Card>
+
+                <Card className="bg-slate-900 text-white border-none">
+                  <CardHeader>
+                    <CardTitle className="text-white">Pending Clearing</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-3xl font-bold opacity-90">R 12,400.00</div>
+                    <p className="text-slate-400 text-sm mt-2">Funds from recently completed jobs. Available in 24-48 hours.</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                   <CardTitle>Transaction History</CardTitle>
+                   <Button variant="outline" size="sm" className="gap-2">
+                     <Download className="w-4 h-4" /> Export CSV
+                   </Button>
+                </CardHeader>
+                <CardContent>
+                  <div className="rounded-md border">
+                    <table className="w-full text-sm text-left">
+                      <thead className="bg-slate-50 text-slate-500 font-medium">
+                        <tr>
+                          <th className="p-4">Date</th>
+                          <th className="p-4">Transaction ID</th>
+                          <th className="p-4">Type</th>
+                          <th className="p-4">Status</th>
+                          <th className="p-4 text-right">Amount</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {transactions.map((txn) => (
+                          <tr key={txn.id} className="border-t">
+                            <td className="p-4">{txn.date}</td>
+                            <td className="p-4 font-mono text-slate-500">{txn.id}</td>
+                            <td className="p-4">
+                              <div className="flex items-center gap-2">
+                                {txn.type === "Withdrawal" ? (
+                                  <ArrowUpRight className="w-4 h-4 text-slate-400" />
+                                ) : (
+                                  <div className="w-4 h-4 rounded-full bg-green-100 flex items-center justify-center text-green-600 text-[10px] font-bold">P</div>
+                                )}
+                                {txn.type}
+                              </div>
+                            </td>
+                            <td className="p-4">
+                              <Badge variant={txn.status === "Completed" ? "outline" : "secondary"} className={txn.status === "Completed" ? "bg-green-50 text-green-700 border-green-100" : ""}>
+                                {txn.status}
+                              </Badge>
+                            </td>
+                            <td className={`p-4 text-right font-bold ${txn.type === "Withdrawal" ? "text-slate-900" : "text-green-600"}`}>
+                              {txn.type === "Withdrawal" ? "-" : "+"} R {txn.amount.toLocaleString()}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           )}
 
