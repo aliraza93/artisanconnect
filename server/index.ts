@@ -2,6 +2,10 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
+import session from "express-session";
+import connectPg from "connect-pg-simple";
+import passport from "./auth";
+import { pool } from "./db";
 
 const app = express();
 const httpServer = createServer(app);
@@ -21,6 +25,30 @@ app.use(
 );
 
 app.use(express.urlencoded({ extended: false }));
+
+// Session configuration with PostgreSQL store
+const PgStore = connectPg(session);
+app.use(
+  session({
+    store: new PgStore({
+      pool,
+      tableName: "session",
+      createTableIfMissing: true,
+    }),
+    secret: process.env.SESSION_SECRET || "artisanconnect-secret-change-in-production",
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+    },
+  })
+);
+
+// Initialize Passport
+app.use(passport.initialize());
+app.use(passport.session());
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
