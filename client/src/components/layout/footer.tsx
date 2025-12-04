@@ -47,8 +47,6 @@ export function Footer() {
             <h4 className="font-heading font-semibold text-lg mb-4 text-slate-200">Contact</h4>
             <ul className="space-y-2 text-sm text-slate-400">
               <li>support@artisanconnect.co.za</li>
-              <li>+27 11 123 4567</li>
-              <li>Johannesburg, South Africa</li>
             </ul>
           </div>
         </div>
