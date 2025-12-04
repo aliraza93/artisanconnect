@@ -10,6 +10,7 @@ import Home from "@/pages/home";
 import PostJob from "@/pages/post-job";
 import Dashboard from "@/pages/dashboard";
 import AdminDashboard from "@/pages/admin/dashboard";
+import About from "@/pages/about";
 
 function Router() {
   return (
@@ -20,6 +21,9 @@ function Router() {
       <Route path="/admin" component={AdminDashboard} />
       <Route path="/admin/dashboard" component={AdminDashboard} />
       
+      <Route path="/about" component={About} />
+      <Route path="/privacy" component={About} />
+      <Route path="/terms" component={About} />
       <Route path="/find-artisan" component={() => <Home />} /> 
       <Route path="/find-work" component={() => <Home />} /> 
       <Route path="/logistics" component={() => <Home />} /> 
