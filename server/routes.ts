@@ -14,6 +14,9 @@ import {
   insertReviewSchema,
   insertDisputeSchema,
   insertArtisanProfileSchema,
+  insertBankDetailsSchema,
+  insertWithdrawalSchema,
+  insertAdminRequestSchema,
 } from "@shared/schema";
 
 export async function registerRoutes(
@@ -456,6 +459,172 @@ export async function registerRoutes(
       res.json(profile);
     } catch (error: any) {
       res.status(500).json({ error: "Failed to fetch artisan profile" });
+    }
+  });
+
+  // ==================== Bank Details Routes ====================
+  
+  // Get bank details for current user
+  app.get("/api/bank-details", isAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const user = req.user as User;
+      const details = await storage.getBankDetails(user.id);
+      res.json(details || null);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch bank details" });
+    }
+  });
+
+  // Create or update bank details
+  app.post("/api/bank-details", isAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const user = req.user as User;
+      const existingDetails = await storage.getBankDetails(user.id);
+      
+      if (existingDetails) {
+        // Update existing
+        const updated = await storage.updateBankDetails(user.id, req.body);
+        res.json(updated);
+      } else {
+        // Create new
+        const validatedData = insertBankDetailsSchema.parse({
+          ...req.body,
+          userId: user.id,
+        });
+        const created = await storage.createBankDetails(validatedData);
+        res.status(201).json(created);
+      }
+    } catch (error: any) {
+      res.status(400).json({ error: error.message || "Failed to save bank details" });
+    }
+  });
+
+  // ==================== Withdrawal Routes ====================
+  
+  // Get withdrawals for current user
+  app.get("/api/withdrawals", isAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const user = req.user as User;
+      const userWithdrawals = await storage.getWithdrawals(user.id);
+      res.json(userWithdrawals);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch withdrawals" });
+    }
+  });
+
+  // Create withdrawal request
+  app.post("/api/withdrawals", isAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const user = req.user as User;
+      
+      // Check if user has bank details
+      const bankDetailsRecord = await storage.getBankDetails(user.id);
+      if (!bankDetailsRecord) {
+        return res.status(400).json({ error: "Please add bank details before requesting a withdrawal" });
+      }
+      
+      const validatedData = insertWithdrawalSchema.parse({
+        ...req.body,
+        userId: user.id,
+        bankDetailsId: bankDetailsRecord.id,
+        status: 'pending',
+      });
+      
+      const withdrawal = await storage.createWithdrawal(validatedData);
+      res.status(201).json(withdrawal);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message || "Failed to create withdrawal request" });
+    }
+  });
+
+  // Get all withdrawals (admin only)
+  app.get("/api/admin/withdrawals", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const allWithdrawals = await storage.getAllWithdrawals();
+      res.json(allWithdrawals);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch withdrawals" });
+    }
+  });
+
+  // Update withdrawal status (admin only)
+  app.patch("/api/admin/withdrawals/:id", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const updated = await storage.updateWithdrawal(req.params.id, {
+        ...req.body,
+        processedAt: req.body.status === 'completed' ? new Date() : undefined,
+      });
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to update withdrawal" });
+    }
+  });
+
+  // ==================== Admin Request Routes ====================
+  
+  // Request admin access
+  app.post("/api/admin-requests", isAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const user = req.user as User;
+      
+      // Check if already admin
+      if (user.role === 'admin') {
+        return res.status(400).json({ error: "You are already an admin" });
+      }
+      
+      // Check if request already exists
+      const existingRequest = await storage.getAdminRequest(user.id);
+      if (existingRequest) {
+        return res.status(400).json({ error: "Admin request already submitted", request: existingRequest });
+      }
+      
+      const validatedData = insertAdminRequestSchema.parse({
+        userId: user.id,
+        reason: req.body.reason,
+        status: 'pending',
+      });
+      
+      const request = await storage.createAdminRequest(validatedData);
+      res.status(201).json(request);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message || "Failed to submit admin request" });
+    }
+  });
+
+  // Get all admin requests (admin only)
+  app.get("/api/admin/admin-requests", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const requests = await storage.getAdminRequests();
+      res.json(requests);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch admin requests" });
+    }
+  });
+
+  // Approve/reject admin request (admin only)
+  app.patch("/api/admin/admin-requests/:id", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const adminUser = req.user as User;
+      const { status } = req.body;
+      
+      if (!['approved', 'rejected'].includes(status)) {
+        return res.status(400).json({ error: "Invalid status" });
+      }
+      
+      const updated = await storage.updateAdminRequest(req.params.id, {
+        status,
+        reviewedBy: adminUser.id,
+        reviewedAt: new Date(),
+      });
+      
+      // If approved, update user role to admin
+      if (updated && status === 'approved') {
+        await storage.updateUser(updated.userId, { role: 'admin' });
+      }
+      
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to update admin request" });
     }
   });
 

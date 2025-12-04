@@ -25,7 +25,7 @@ import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
-import { api, type Dispute } from "@/lib/api";
+import { api, type Dispute, type BankDetails, type Withdrawal } from "@/lib/api";
 
 export default function AdminDashboard() {
   const { toast } = useToast();
@@ -38,7 +38,19 @@ export default function AdminDashboard() {
   // Real data states
   const [revenue, setRevenue] = useState<number>(0);
   const [disputes, setDisputes] = useState<Dispute[]>([]);
+  const [bankDetails, setBankDetails] = useState<BankDetails | null>(null);
+  const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
   const [loading, setLoading] = useState(true);
+  const [savingBankDetails, setSavingBankDetails] = useState(false);
+  
+  // Bank details form state
+  const [bankForm, setBankForm] = useState({
+    bankName: '',
+    accountHolder: '',
+    accountNumber: '',
+    branchCode: '',
+    accountType: 'savings',
+  });
 
   useEffect(() => {
     if (!authLoading && (!user || user.role !== 'admin')) {
@@ -59,12 +71,27 @@ export default function AdminDashboard() {
   const fetchAdminData = async () => {
     setLoading(true);
     try {
-      const [revenueData, disputesData] = await Promise.all([
+      const [revenueData, disputesData, bankDetailsData, withdrawalsData] = await Promise.all([
         api.getPlatformRevenue(),
         api.getDisputes(),
+        api.getBankDetails(),
+        api.getWithdrawals(),
       ]);
       setRevenue(revenueData.revenue);
       setDisputes(disputesData);
+      setBankDetails(bankDetailsData);
+      setWithdrawals(withdrawalsData);
+      
+      // Populate form if bank details exist
+      if (bankDetailsData) {
+        setBankForm({
+          bankName: bankDetailsData.bankName,
+          accountHolder: bankDetailsData.accountHolder,
+          accountNumber: bankDetailsData.accountNumber,
+          branchCode: bankDetailsData.branchCode,
+          accountType: bankDetailsData.accountType,
+        });
+      }
     } catch (error: any) {
       console.error('Failed to fetch admin data:', error);
       toast({
@@ -86,13 +113,74 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleWithdraw = (e: React.FormEvent) => {
+  const handleWithdraw = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast({
-      title: "Withdrawal Initiated",
-      description: `Your request to withdraw R ${withdrawAmount} has been processed. Funds will reflect in 1-3 business days.`,
-    });
-    setWithdrawAmount("");
+    
+    if (!bankDetails) {
+      toast({
+        title: "Bank Details Required",
+        description: "Please add your bank details before requesting a withdrawal.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    const amount = parseFloat(withdrawAmount);
+    if (isNaN(amount) || amount <= 0) {
+      toast({
+        title: "Invalid Amount",
+        description: "Please enter a valid withdrawal amount.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (amount > revenue) {
+      toast({
+        title: "Insufficient Funds",
+        description: "Withdrawal amount exceeds available balance.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    try {
+      await api.createWithdrawal(withdrawAmount);
+      toast({
+        title: "Withdrawal Initiated",
+        description: `Your request to withdraw R ${withdrawAmount} has been submitted. Funds will reflect in 1-3 business days.`,
+      });
+      setWithdrawAmount("");
+      fetchAdminData();
+    } catch (error: any) {
+      toast({
+        title: "Withdrawal Failed",
+        description: error.message || "Failed to process withdrawal request.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleSaveBankDetails = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingBankDetails(true);
+    
+    try {
+      const saved = await api.saveBankDetails(bankForm);
+      setBankDetails(saved);
+      toast({
+        title: "Bank Details Saved",
+        description: "Your bank details have been saved successfully.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Failed to Save",
+        description: error.message || "Could not save bank details.",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingBankDetails(false);
+    }
   };
 
   const handleResolveDispute = async (disputeId: string) => {
@@ -124,10 +212,6 @@ export default function AdminDashboard() {
     { id: 3, sender: "other", text: "That works. Please bring the invoice.", time: "10:36 AM" },
   ];
 
-  // Mock transaction data (would come from payments API in production)
-  const transactions = [
-    { id: "TXN-1001", date: "2025-12-04", type: "Platform Fee", amount: revenue, status: "Completed", job: "All Jobs" },
-  ];
 
   if (authLoading) {
     return (
@@ -377,14 +461,26 @@ export default function AdminDashboard() {
                             data-testid="input-withdraw-amount"
                           />
                         </div>
-                        <Button type="submit" className="bg-green-600 hover:bg-green-700" data-testid="button-withdraw">
+                        <Button 
+                          type="submit" 
+                          className="bg-green-600 hover:bg-green-700" 
+                          data-testid="button-withdraw"
+                          disabled={!bankDetails}
+                        >
                           Withdraw Funds
                         </Button>
                       </form>
-                      <div className="text-xs text-slate-400 flex items-center gap-1">
-                        <Wallet className="w-3 h-3" />
-                        <span>Payout to: FNB Business Account (**** 4552)</span>
-                      </div>
+                      {bankDetails ? (
+                        <div className="text-xs text-slate-400 flex items-center gap-1">
+                          <Wallet className="w-3 h-3" />
+                          <span>Payout to: {bankDetails.bankName} (**** {bankDetails.accountNumber.slice(-4)})</span>
+                        </div>
+                      ) : (
+                        <div className="text-xs text-orange-500 flex items-center gap-1">
+                          <AlertTriangle className="w-3 h-3" />
+                          <span>Add bank details below to enable withdrawals</span>
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -400,9 +496,80 @@ export default function AdminDashboard() {
                 </Card>
               </div>
 
+              {/* Bank Details Form */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>{bankDetails ? "Update Bank Details" : "Add Bank Details"}</CardTitle>
+                  <CardDescription>Enter your bank account details for receiving withdrawals</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <form onSubmit={handleSaveBankDetails} className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-slate-700">Bank Name</label>
+                        <Input 
+                          placeholder="e.g., FNB, Standard Bank, ABSA"
+                          value={bankForm.bankName}
+                          onChange={(e) => setBankForm({...bankForm, bankName: e.target.value})}
+                          required
+                          data-testid="input-bank-name"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-slate-700">Account Holder Name</label>
+                        <Input 
+                          placeholder="Name as it appears on account"
+                          value={bankForm.accountHolder}
+                          onChange={(e) => setBankForm({...bankForm, accountHolder: e.target.value})}
+                          required
+                          data-testid="input-account-holder"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-slate-700">Account Number</label>
+                        <Input 
+                          placeholder="Your bank account number"
+                          value={bankForm.accountNumber}
+                          onChange={(e) => setBankForm({...bankForm, accountNumber: e.target.value})}
+                          required
+                          data-testid="input-account-number"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-slate-700">Branch Code</label>
+                        <Input 
+                          placeholder="e.g., 250655"
+                          value={bankForm.branchCode}
+                          onChange={(e) => setBankForm({...bankForm, branchCode: e.target.value})}
+                          required
+                          data-testid="input-branch-code"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-slate-700">Account Type</label>
+                        <select 
+                          className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm ring-offset-white focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+                          value={bankForm.accountType}
+                          onChange={(e) => setBankForm({...bankForm, accountType: e.target.value})}
+                          data-testid="select-account-type"
+                        >
+                          <option value="savings">Savings Account</option>
+                          <option value="current">Current Account</option>
+                          <option value="cheque">Cheque Account</option>
+                        </select>
+                      </div>
+                    </div>
+                    <Button type="submit" disabled={savingBankDetails} data-testid="button-save-bank-details">
+                      {savingBankDetails ? "Saving..." : (bankDetails ? "Update Bank Details" : "Save Bank Details")}
+                    </Button>
+                  </form>
+                </CardContent>
+              </Card>
+
+              {/* Withdrawal History */}
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
-                  <CardTitle>Transaction History</CardTitle>
+                  <CardTitle>Withdrawal History</CardTitle>
                   <Button variant="outline" size="sm" className="gap-2">
                     <Download className="w-4 h-4" /> Export CSV
                   </Button>
@@ -413,37 +580,42 @@ export default function AdminDashboard() {
                       <thead className="bg-slate-50 text-slate-500 font-medium">
                         <tr>
                           <th className="p-4">Date</th>
-                          <th className="p-4">Transaction ID</th>
-                          <th className="p-4">Type</th>
+                          <th className="p-4">Reference</th>
                           <th className="p-4">Status</th>
                           <th className="p-4 text-right">Amount</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {transactions.map((txn) => (
-                          <tr key={txn.id} className="border-t">
-                            <td className="p-4">{txn.date}</td>
-                            <td className="p-4 font-mono text-slate-500">{txn.id}</td>
-                            <td className="p-4">
-                              <div className="flex items-center gap-2">
-                                {txn.type === "Withdrawal" ? (
-                                  <ArrowUpRight className="w-4 h-4 text-slate-400" />
-                                ) : (
-                                  <div className="w-4 h-4 rounded-full bg-green-100 flex items-center justify-center text-green-600 text-[10px] font-bold">P</div>
-                                )}
-                                {txn.type}
-                              </div>
-                            </td>
-                            <td className="p-4">
-                              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-100">
-                                {txn.status}
-                              </Badge>
-                            </td>
-                            <td className="p-4 text-right font-bold text-green-600">
-                              + R {txn.amount.toLocaleString()}
+                        {withdrawals.length === 0 ? (
+                          <tr>
+                            <td colSpan={4} className="p-8 text-center text-slate-500">
+                              No withdrawals yet
                             </td>
                           </tr>
-                        ))}
+                        ) : (
+                          withdrawals.map((w) => (
+                            <tr key={w.id} className="border-t">
+                              <td className="p-4">{new Date(w.createdAt).toLocaleDateString()}</td>
+                              <td className="p-4 font-mono text-slate-500">{w.id.substring(0, 8).toUpperCase()}</td>
+                              <td className="p-4">
+                                <Badge 
+                                  variant="outline" 
+                                  className={
+                                    w.status === 'completed' ? "bg-green-50 text-green-700 border-green-100" :
+                                    w.status === 'pending' ? "bg-yellow-50 text-yellow-700 border-yellow-100" :
+                                    w.status === 'processing' ? "bg-blue-50 text-blue-700 border-blue-100" :
+                                    "bg-red-50 text-red-700 border-red-100"
+                                  }
+                                >
+                                  {w.status}
+                                </Badge>
+                              </td>
+                              <td className="p-4 text-right font-bold text-slate-900">
+                                R {parseFloat(w.amount).toLocaleString()}
+                              </td>
+                            </tr>
+                          ))
+                        )}
                       </tbody>
                     </table>
                   </div>

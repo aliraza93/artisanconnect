@@ -98,6 +98,39 @@ export interface Dispute {
   resolvedAt: string | null;
 }
 
+export interface BankDetails {
+  id: string;
+  userId: string;
+  bankName: string;
+  accountHolder: string;
+  accountNumber: string;
+  branchCode: string;
+  accountType: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Withdrawal {
+  id: string;
+  userId: string;
+  amount: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  bankDetailsId: string;
+  reference: string | null;
+  processedAt: string | null;
+  createdAt: string;
+}
+
+export interface AdminRequest {
+  id: string;
+  userId: string;
+  reason: string;
+  status: 'pending' | 'approved' | 'rejected';
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  createdAt: string;
+}
+
 class ApiClient {
   private baseUrl = '/api';
 
@@ -309,6 +342,66 @@ class ApiClient {
 
   async getArtisanProfile(userId: string): Promise<ArtisanProfile> {
     return this.request<ArtisanProfile>(`/artisans/${userId}/profile`);
+  }
+
+  // Bank Details
+  async getBankDetails(): Promise<BankDetails | null> {
+    return this.request<BankDetails | null>('/bank-details');
+  }
+
+  async saveBankDetails(data: {
+    bankName: string;
+    accountHolder: string;
+    accountNumber: string;
+    branchCode: string;
+    accountType: string;
+  }): Promise<BankDetails> {
+    return this.request<BankDetails>('/bank-details', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // Withdrawals
+  async getWithdrawals(): Promise<Withdrawal[]> {
+    return this.request<Withdrawal[]>('/withdrawals');
+  }
+
+  async createWithdrawal(amount: string): Promise<Withdrawal> {
+    return this.request<Withdrawal>('/withdrawals', {
+      method: 'POST',
+      body: JSON.stringify({ amount }),
+    });
+  }
+
+  async getAllWithdrawals(): Promise<Withdrawal[]> {
+    return this.request<Withdrawal[]>('/admin/withdrawals');
+  }
+
+  async updateWithdrawal(id: string, updates: Partial<Withdrawal>): Promise<Withdrawal> {
+    return this.request<Withdrawal>(`/admin/withdrawals/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(updates),
+    });
+  }
+
+  // Admin Requests
+  async requestAdminAccess(reason: string): Promise<AdminRequest> {
+    return this.request<AdminRequest>('/admin-requests', {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    });
+  }
+
+  async getAdminRequests(): Promise<AdminRequest[]> {
+    return this.request<AdminRequest[]>('/admin/admin-requests');
+  }
+
+  async updateAdminRequest(id: string, status: 'approved' | 'rejected'): Promise<AdminRequest> {
+    return this.request<AdminRequest>(`/admin/admin-requests/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    });
   }
 }
 

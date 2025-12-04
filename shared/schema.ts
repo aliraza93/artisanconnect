@@ -144,3 +144,54 @@ export const disputes = pgTable('disputes', {
 export const insertDisputeSchema = createInsertSchema(disputes).omit({ id: true, createdAt: true });
 export type InsertDispute = z.infer<typeof insertDisputeSchema>;
 export type Dispute = typeof disputes.$inferSelect;
+
+// Bank Details Table (for withdrawals)
+export const bankDetails = pgTable('bank_details', {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar().notNull().references(() => users.id).unique(),
+  bankName: text().notNull(),
+  accountHolder: text().notNull(),
+  accountNumber: text().notNull(),
+  branchCode: text().notNull(),
+  accountType: text().notNull(), // 'savings', 'current', 'cheque'
+  createdAt: timestamp().notNull().defaultNow(),
+  updatedAt: timestamp().notNull().defaultNow(),
+});
+
+export const insertBankDetailsSchema = createInsertSchema(bankDetails).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertBankDetails = z.infer<typeof insertBankDetailsSchema>;
+export type BankDetails = typeof bankDetails.$inferSelect;
+
+// Withdrawal Status Enum
+export const withdrawalStatusEnum = pgEnum('withdrawal_status', ['pending', 'processing', 'completed', 'failed']);
+
+// Withdrawals Table
+export const withdrawals = pgTable('withdrawals', {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar().notNull().references(() => users.id),
+  amount: text().notNull(),
+  status: withdrawalStatusEnum().notNull().default('pending'),
+  bankDetailsId: varchar().notNull().references(() => bankDetails.id),
+  reference: text(),
+  processedAt: timestamp(),
+  createdAt: timestamp().notNull().defaultNow(),
+});
+
+export const insertWithdrawalSchema = createInsertSchema(withdrawals).omit({ id: true, createdAt: true });
+export type InsertWithdrawal = z.infer<typeof insertWithdrawalSchema>;
+export type Withdrawal = typeof withdrawals.$inferSelect;
+
+// Admin Requests Table (for users requesting admin access)
+export const adminRequests = pgTable('admin_requests', {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar().notNull().references(() => users.id).unique(),
+  reason: text().notNull(),
+  status: text().notNull().default('pending'), // 'pending', 'approved', 'rejected'
+  reviewedBy: varchar().references(() => users.id),
+  reviewedAt: timestamp(),
+  createdAt: timestamp().notNull().defaultNow(),
+});
+
+export const insertAdminRequestSchema = createInsertSchema(adminRequests).omit({ id: true, createdAt: true });
+export type InsertAdminRequest = z.infer<typeof insertAdminRequestSchema>;
+export type AdminRequest = typeof adminRequests.$inferSelect;

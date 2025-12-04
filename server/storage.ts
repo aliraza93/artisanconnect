@@ -7,6 +7,9 @@ import {
   reviews,
   disputes,
   artisanProfiles,
+  bankDetails,
+  withdrawals,
+  adminRequests,
   type User,
   type InsertUser,
   type Job,
@@ -23,6 +26,12 @@ import {
   type InsertDispute,
   type ArtisanProfile,
   type InsertArtisanProfile,
+  type BankDetails,
+  type InsertBankDetails,
+  type Withdrawal,
+  type InsertWithdrawal,
+  type AdminRequest,
+  type InsertAdminRequest,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, or, desc } from "drizzle-orm";
@@ -73,6 +82,23 @@ export interface IStorage {
   createDispute(dispute: InsertDispute): Promise<Dispute>;
   getDisputes(): Promise<Dispute[]>;
   updateDispute(id: string, updates: Partial<Dispute>): Promise<Dispute | undefined>;
+
+  // Bank Details
+  getBankDetails(userId: string): Promise<BankDetails | undefined>;
+  createBankDetails(details: InsertBankDetails): Promise<BankDetails>;
+  updateBankDetails(userId: string, updates: Partial<BankDetails>): Promise<BankDetails | undefined>;
+
+  // Withdrawals
+  createWithdrawal(withdrawal: InsertWithdrawal): Promise<Withdrawal>;
+  getWithdrawals(userId: string): Promise<Withdrawal[]>;
+  getAllWithdrawals(): Promise<Withdrawal[]>;
+  updateWithdrawal(id: string, updates: Partial<Withdrawal>): Promise<Withdrawal | undefined>;
+
+  // Admin Requests
+  createAdminRequest(request: InsertAdminRequest): Promise<AdminRequest>;
+  getAdminRequests(): Promise<AdminRequest[]>;
+  getAdminRequest(userId: string): Promise<AdminRequest | undefined>;
+  updateAdminRequest(id: string, updates: Partial<AdminRequest>): Promise<AdminRequest | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -241,6 +267,64 @@ export class DatabaseStorage implements IStorage {
   async updateDispute(id: string, updates: Partial<Dispute>): Promise<Dispute | undefined> {
     const [dispute] = await db.update(disputes).set(updates).where(eq(disputes.id, id)).returning();
     return dispute || undefined;
+  }
+
+  // Bank Details
+  async getBankDetails(userId: string): Promise<BankDetails | undefined> {
+    const [details] = await db.select().from(bankDetails).where(eq(bankDetails.userId, userId));
+    return details || undefined;
+  }
+
+  async createBankDetails(details: InsertBankDetails): Promise<BankDetails> {
+    const [created] = await db.insert(bankDetails).values(details).returning();
+    return created;
+  }
+
+  async updateBankDetails(userId: string, updates: Partial<BankDetails>): Promise<BankDetails | undefined> {
+    const [updated] = await db.update(bankDetails)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(bankDetails.userId, userId))
+      .returning();
+    return updated || undefined;
+  }
+
+  // Withdrawals
+  async createWithdrawal(withdrawal: InsertWithdrawal): Promise<Withdrawal> {
+    const [created] = await db.insert(withdrawals).values(withdrawal).returning();
+    return created;
+  }
+
+  async getWithdrawals(userId: string): Promise<Withdrawal[]> {
+    return db.select().from(withdrawals).where(eq(withdrawals.userId, userId)).orderBy(desc(withdrawals.createdAt));
+  }
+
+  async getAllWithdrawals(): Promise<Withdrawal[]> {
+    return db.select().from(withdrawals).orderBy(desc(withdrawals.createdAt));
+  }
+
+  async updateWithdrawal(id: string, updates: Partial<Withdrawal>): Promise<Withdrawal | undefined> {
+    const [updated] = await db.update(withdrawals).set(updates).where(eq(withdrawals.id, id)).returning();
+    return updated || undefined;
+  }
+
+  // Admin Requests
+  async createAdminRequest(request: InsertAdminRequest): Promise<AdminRequest> {
+    const [created] = await db.insert(adminRequests).values(request).returning();
+    return created;
+  }
+
+  async getAdminRequests(): Promise<AdminRequest[]> {
+    return db.select().from(adminRequests).orderBy(desc(adminRequests.createdAt));
+  }
+
+  async getAdminRequest(userId: string): Promise<AdminRequest | undefined> {
+    const [request] = await db.select().from(adminRequests).where(eq(adminRequests.userId, userId));
+    return request || undefined;
+  }
+
+  async updateAdminRequest(id: string, updates: Partial<AdminRequest>): Promise<AdminRequest | undefined> {
+    const [updated] = await db.update(adminRequests).set(updates).where(eq(adminRequests.id, id)).returning();
+    return updated || undefined;
   }
 }
 
