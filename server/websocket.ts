@@ -3,6 +3,8 @@ import type { Server } from "http";
 import type { IncomingMessage } from "http";
 import { storage } from "./storage";
 import { log } from "./index";
+import cookie from "cookie";
+import { pool } from "./db";
 
 interface ConnectedClient {
   ws: WebSocket;
@@ -11,6 +13,40 @@ interface ConnectedClient {
 }
 
 const clients = new Map<string, ConnectedClient[]>();
+
+async function validateSession(req: IncomingMessage): Promise<string | null> {
+  try {
+    const cookies = cookie.parse(req.headers.cookie || "");
+    const sessionId = cookies["connect.sid"];
+    
+    if (!sessionId) {
+      return null;
+    }
+
+    const rawSid = sessionId.startsWith("s:") 
+      ? sessionId.slice(2).split(".")[0] 
+      : sessionId;
+
+    const result = await pool.query(
+      'SELECT sess FROM "session" WHERE sid = $1',
+      [rawSid]
+    );
+    
+    if (result.rows.length === 0) {
+      return null;
+    }
+    
+    const session = result.rows[0].sess;
+    if (!session || !session.passport?.user) {
+      return null;
+    }
+    
+    return session.passport.user;
+  } catch (error) {
+    log(`Session validation error: ${error}`, "websocket");
+    return null;
+  }
+}
 
 export function setupWebSocket(server: Server) {
   const wss = new WebSocketServer({ 
@@ -39,14 +75,16 @@ export function setupWebSocket(server: Server) {
     clearInterval(heartbeatInterval);
   });
 
-  wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
-    const url = new URL(req.url || "", `http://${req.headers.host}`);
-    const userId = url.searchParams.get("userId");
-
-    if (!userId) {
-      ws.close(1008, "User ID required");
+  wss.on("connection", async (ws: WebSocket, req: IncomingMessage) => {
+    const sessionUserId = await validateSession(req);
+    
+    if (!sessionUserId) {
+      log("WebSocket connection rejected: invalid session", "websocket");
+      ws.close(1008, "Authentication required");
       return;
     }
+
+    const userId = sessionUserId;
 
     log(`WebSocket connected: user ${userId}`, "websocket");
 

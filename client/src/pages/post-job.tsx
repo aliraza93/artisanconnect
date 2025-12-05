@@ -13,6 +13,9 @@ import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
 import { LoginModal } from "@/components/auth/login-modal";
 import { SignupModal } from "@/components/auth/signup-modal";
+import { ObjectUploader } from "@/components/ObjectUploader";
+import { Camera, X } from "lucide-react";
+import type { UploadResult } from "@uppy/core";
 
 export default function PostJob() {
   const { toast } = useToast();
@@ -21,6 +24,7 @@ export default function PostJob() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
   const [showSignup, setShowSignup] = useState(false);
+  const [uploadedImages, setUploadedImages] = useState<string[]>([]);
 
   const [formData, setFormData] = useState({
     title: "",
@@ -36,6 +40,31 @@ export default function PostJob() {
       setShowSignup(true);
     }
   }, [loading, user]);
+
+  const handleGetUploadParameters = async () => {
+    const response = await fetch('/api/objects/upload', {
+      method: 'POST',
+      credentials: 'include',
+    });
+    const data = await response.json();
+    return {
+      method: 'PUT' as const,
+      url: data.uploadURL,
+    };
+  };
+
+  const handleUploadComplete = (result: UploadResult<Record<string, unknown>, Record<string, unknown>>) => {
+    const newImages = result.successful?.map(file => file.uploadURL as string) || [];
+    setUploadedImages(prev => [...prev, ...newImages]);
+    toast({
+      title: "Image uploaded",
+      description: "Your photo has been added to the job.",
+    });
+  };
+
+  const removeImage = (index: number) => {
+    setUploadedImages(prev => prev.filter((_, i) => i !== index));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,7 +85,7 @@ export default function PostJob() {
     setIsSubmitting(true);
     
     try {
-      await api.createJob({
+      const job = await api.createJob({
         title: formData.title,
         description: formData.description,
         category: formData.category,
@@ -64,6 +93,20 @@ export default function PostJob() {
         budget: formData.budget || undefined,
         needsLogistics: formData.needsLogistics,
       });
+
+      // Add uploaded images to the job
+      for (const imageURL of uploadedImages) {
+        try {
+          await fetch(`/api/jobs/${job.id}/images`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ imageURL }),
+          });
+        } catch (imgError) {
+          console.error('Failed to add image to job:', imgError);
+        }
+      }
 
       toast({
         title: "Job Posted Successfully!",
@@ -179,6 +222,57 @@ export default function PostJob() {
                   <Label htmlFor="logistics" className="text-sm text-slate-600 font-normal">
                     I need materials delivered or rubble removed
                   </Label>
+                </div>
+
+                {/* Image Upload Section */}
+                <div className="space-y-3">
+                  <Label className="text-base font-medium">Photos (Optional)</Label>
+                  <p className="text-sm text-slate-500">
+                    Add photos to help artisans understand the job better
+                  </p>
+                  
+                  {/* Uploaded Images Preview */}
+                  {uploadedImages.length > 0 && (
+                    <div className="flex flex-wrap gap-3" data-testid="uploaded-images-container">
+                      {uploadedImages.map((url, index) => (
+                        <div key={index} className="relative group">
+                          <img 
+                            src={url} 
+                            alt={`Uploaded ${index + 1}`}
+                            className="w-24 h-24 object-cover rounded-lg border border-slate-200"
+                            data-testid={`uploaded-image-${index}`}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeImage(index)}
+                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                            data-testid={`button-remove-image-${index}`}
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {user && uploadedImages.length < 5 && (
+                    <ObjectUploader
+                      maxNumberOfFiles={5}
+                      maxFileSize={10485760}
+                      onGetUploadParameters={handleGetUploadParameters}
+                      onComplete={handleUploadComplete}
+                      buttonClassName="flex items-center gap-2"
+                    >
+                      <Camera className="h-4 w-4" />
+                      <span>Add Photos</span>
+                    </ObjectUploader>
+                  )}
+                  
+                  {!user && (
+                    <p className="text-sm text-slate-400 italic">
+                      Sign in to upload photos
+                    </p>
+                  )}
                 </div>
 
                 <div className="pt-4">

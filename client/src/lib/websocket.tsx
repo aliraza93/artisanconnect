@@ -32,7 +32,7 @@ export function WebSocketProvider({ children, userId, onNewMessage, onNotificati
     if (!userId || wsRef.current?.readyState === WebSocket.OPEN) return;
 
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = `${protocol}//${window.location.host}/ws?userId=${userId}`;
+    const wsUrl = `${protocol}//${window.location.host}/ws`;
     
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;

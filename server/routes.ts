@@ -801,5 +801,108 @@ export async function registerRoutes(
     }
   });
 
+  // ==================== Object Storage / Image Upload Routes ====================
+  
+  // Serve public objects
+  app.get("/public-objects/:filePath(*)", async (req: Request, res: Response) => {
+    try {
+      const { ObjectStorageService } = await import('./objectStorage');
+      const filePath = req.params.filePath;
+      const objectStorageService = new ObjectStorageService();
+      const file = await objectStorageService.searchPublicObject(filePath);
+      if (!file) {
+        return res.status(404).json({ error: "File not found" });
+      }
+      objectStorageService.downloadObject(file, res);
+    } catch (error) {
+      console.error("Error searching for public object:", error);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Serve private/uploaded objects (with optional ACL check)
+  app.get("/objects/:objectPath(*)", async (req: Request, res: Response) => {
+    try {
+      const { ObjectStorageService, ObjectNotFoundError } = await import('./objectStorage');
+      const objectStorageService = new ObjectStorageService();
+      const objectFile = await objectStorageService.getObjectEntityFile(req.path);
+      objectStorageService.downloadObject(objectFile, res);
+    } catch (error: any) {
+      console.error("Error fetching object:", error);
+      if (error.name === 'ObjectNotFoundError') {
+        return res.sendStatus(404);
+      }
+      return res.sendStatus(500);
+    }
+  });
+
+  // Get upload URL for job images
+  app.post("/api/objects/upload", isAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const { ObjectStorageService } = await import('./objectStorage');
+      const objectStorageService = new ObjectStorageService();
+      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+      res.json({ uploadURL });
+    } catch (error) {
+      console.error("Error getting upload URL:", error);
+      res.status(500).json({ error: "Failed to get upload URL" });
+    }
+  });
+
+  // Update job images after upload
+  app.put("/api/jobs/:id/images", isAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const user = req.user as User;
+      const jobId = req.params.id;
+      const { imageURL } = req.body;
+
+      if (!imageURL) {
+        return res.status(400).json({ error: "imageURL is required" });
+      }
+
+      // Validate URL is from Google Cloud Storage (our object storage)
+      if (!imageURL.startsWith('https://storage.googleapis.com/')) {
+        return res.status(400).json({ error: "Invalid image URL - must be from our storage" });
+      }
+
+      const job = await storage.getJob(jobId);
+      if (!job) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+
+      // Only job owner or admin can add images
+      if (job.clientId !== user.id && user.role !== 'admin') {
+        return res.status(403).json({ error: "Unauthorized" });
+      }
+
+      const { ObjectStorageService } = await import('./objectStorage');
+      const objectStorageService = new ObjectStorageService();
+      
+      // Set ACL policy - public so artisans can view
+      const objectPath = await objectStorageService.trySetObjectEntityAclPolicy(
+        imageURL,
+        {
+          owner: user.id,
+          visibility: "public",
+        }
+      );
+
+      // Add image to job's images array
+      const currentImages = job.images || [];
+      const updatedImages = [...currentImages, objectPath];
+      
+      await storage.updateJob(jobId, { images: updatedImages });
+
+      res.json({ 
+        success: true, 
+        objectPath,
+        images: updatedImages
+      });
+    } catch (error) {
+      console.error("Error adding job image:", error);
+      res.status(500).json({ error: "Failed to add image" });
+    }
+  });
+
   return httpServer;
 }

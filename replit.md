@@ -8,6 +8,16 @@ ArtisanConnect SA is a production-ready Progressive Web App (PWA) marketplace co
 
 ## Recent Changes
 
+### December 5, 2025 - Platform Enhancements
+- ✅ WebSocket real-time messaging infrastructure (server/websocket.ts, client/src/lib/websocket.tsx)
+- ✅ PWA configuration complete (manifest.json, service worker, install prompt, offline support)
+- ✅ Stripe payment integration with escrow system
+- ✅ Object storage for job images using Replit's built-in storage
+- ✅ Image upload component (client/src/components/ObjectUploader.tsx)
+- ✅ Job posting page with image upload support
+- ⏭️ Email notifications (SendGrid) - User dismissed integration
+- ⏭️ SMS notifications (Twilio) - User dismissed integration
+
 ### December 4, 2025 - Full Frontend-Backend Integration Complete
 - ✅ PostgreSQL database provisioned with complete schema
 - ✅ Authentication system implemented with passport-local and bcrypt

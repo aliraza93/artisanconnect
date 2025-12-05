@@ -57,6 +57,7 @@ export const jobs = pgTable('jobs', {
   budget: text(),
   status: jobStatusEnum().notNull().default('open'),
   needsLogistics: boolean().notNull().default(false),
+  images: text().array(),
   createdAt: timestamp().notNull().defaultNow(),
   updatedAt: timestamp().notNull().defaultNow(),
 });

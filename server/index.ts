@@ -100,14 +100,10 @@ app.use(
 app.use(express.urlencoded({ extended: false }));
 
 // Session configuration with PostgreSQL store
-const PgStore = connectPg(session);
+import { sessionStore } from "./sessionStore";
 app.use(
   session({
-    store: new PgStore({
-      pool,
-      tableName: "session",
-      createTableIfMissing: true,
-    }),
+    store: sessionStore,
     secret: process.env.SESSION_SECRET || "artisanconnect-secret-change-in-production",
     resave: false,
     saveUninitialized: false,
