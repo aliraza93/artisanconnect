@@ -9,7 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { MapPin, Star, AlertCircle, Plus, Briefcase, Clock, CheckCircle, DollarSign } from "lucide-react";
+import { MapPin, Star, AlertCircle, Plus, Briefcase, Clock, CheckCircle, DollarSign, CreditCard, Building } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ChatInterface } from "@/components/chat/chat-interface";
 import { useAuth } from "@/lib/auth-context";
 import { api, type Job, type Quote, type Payment } from "@/lib/api";
@@ -48,6 +49,18 @@ export default function Dashboard() {
   const [completionStep, setCompletionStep] = useState<'hours' | 'confirm'>('hours');
   const [calculatedPayout, setCalculatedPayout] = useState<any>(null);
   const [processingCompletion, setProcessingCompletion] = useState(false);
+  
+  // Bank details state
+  const [bankDetails, setBankDetails] = useState<any>(null);
+  const [loadingBankDetails, setLoadingBankDetails] = useState(false);
+  const [savingBankDetails, setSavingBankDetails] = useState(false);
+  const [bankForm, setBankForm] = useState({
+    bankName: '',
+    accountHolder: '',
+    accountNumber: '',
+    branchCode: '',
+    accountType: 'savings',
+  });
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -108,6 +121,82 @@ export default function Dashboard() {
       setLoading(false);
     }
   };
+
+  // Fetch bank details for artisans
+  const fetchBankDetails = async () => {
+    if (user?.role !== 'artisan') return;
+    
+    setLoadingBankDetails(true);
+    try {
+      const response = await fetch('/api/bank-details', {
+        credentials: 'include',
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setBankDetails(data);
+        setBankForm({
+          bankName: data.bankName || '',
+          accountHolder: data.accountHolder || '',
+          accountNumber: data.accountNumber || '',
+          branchCode: data.branchCode || '',
+          accountType: data.accountType || 'savings',
+        });
+      }
+    } catch (error) {
+      console.error('Failed to fetch bank details:', error);
+    } finally {
+      setLoadingBankDetails(false);
+    }
+  };
+
+  // Save bank details
+  const saveBankDetails = async () => {
+    if (!bankForm.bankName || !bankForm.accountHolder || !bankForm.accountNumber || !bankForm.branchCode) {
+      toast({
+        title: "Missing information",
+        description: "Please fill in all required fields.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSavingBankDetails(true);
+    try {
+      const response = await fetch('/api/bank-details', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(bankForm),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to save bank details');
+      }
+
+      const saved = await response.json();
+      setBankDetails(saved);
+      toast({
+        title: "Bank details saved!",
+        description: "Your payment information has been updated.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Failed to save",
+        description: error.message || "Could not save bank details. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingBankDetails(false);
+    }
+  };
+
+  // Fetch bank details on initial load for artisans
+  useEffect(() => {
+    if (user?.role === 'artisan') {
+      fetchBankDetails();
+    }
+  }, [user]);
 
   const handleAcceptQuote = async (quoteId: string) => {
     try {
@@ -379,6 +468,12 @@ export default function Dashboard() {
             <TabsList className="mb-6">
               <TabsTrigger value="overview" data-testid="tab-overview">Overview</TabsTrigger>
               <TabsTrigger value="messages" data-testid="tab-messages">Messages</TabsTrigger>
+              {user.role === 'artisan' && (
+                <TabsTrigger value="payment-settings" data-testid="tab-payment-settings">
+                  <CreditCard className="w-4 h-4 mr-2" />
+                  Payment Settings
+                </TabsTrigger>
+              )}
             </TabsList>
              
             <TabsContent value="overview">
@@ -774,6 +869,148 @@ export default function Dashboard() {
                 </Card>
               </div>
             </TabsContent>
+
+            {/* Payment Settings Tab (Artisan Only) */}
+            {user.role === 'artisan' && (
+              <TabsContent value="payment-settings">
+                <div className="max-w-2xl mx-auto">
+                  <Card className="border-none shadow-sm">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Building className="w-5 h-5" />
+                        Bank Account Details
+                      </CardTitle>
+                      <CardDescription>
+                        Add your bank details to receive payments for completed jobs.
+                        Your information is securely stored and only used for payments.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {loadingBankDetails ? (
+                        <div className="space-y-4">
+                          <Skeleton className="h-10 w-full" />
+                          <Skeleton className="h-10 w-full" />
+                          <Skeleton className="h-10 w-full" />
+                          <Skeleton className="h-10 w-full" />
+                        </div>
+                      ) : (
+                        <div className="space-y-6">
+                          {bankDetails && (
+                            <div className="p-4 bg-green-50 rounded-lg border border-green-100 mb-4">
+                              <div className="flex items-center gap-2 text-green-700">
+                                <CheckCircle className="w-4 h-4" />
+                                <span className="font-medium">Bank details on file</span>
+                              </div>
+                              <p className="text-sm text-green-600 mt-1">
+                                Account ending in •••{bankDetails.accountNumber?.slice(-4)}
+                              </p>
+                            </div>
+                          )}
+
+                          <div className="space-y-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="bankName">Bank Name *</Label>
+                              <Select
+                                value={bankForm.bankName}
+                                onValueChange={(value) => setBankForm({ ...bankForm, bankName: value })}
+                              >
+                                <SelectTrigger data-testid="select-bank-name">
+                                  <SelectValue placeholder="Select your bank" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="ABSA">ABSA</SelectItem>
+                                  <SelectItem value="Capitec">Capitec Bank</SelectItem>
+                                  <SelectItem value="FNB">First National Bank (FNB)</SelectItem>
+                                  <SelectItem value="Nedbank">Nedbank</SelectItem>
+                                  <SelectItem value="Standard Bank">Standard Bank</SelectItem>
+                                  <SelectItem value="African Bank">African Bank</SelectItem>
+                                  <SelectItem value="Discovery Bank">Discovery Bank</SelectItem>
+                                  <SelectItem value="TymeBank">TymeBank</SelectItem>
+                                  <SelectItem value="Bank Zero">Bank Zero</SelectItem>
+                                  <SelectItem value="Other">Other</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label htmlFor="accountHolder">Account Holder Name *</Label>
+                              <Input
+                                id="accountHolder"
+                                placeholder="Full name as it appears on account"
+                                value={bankForm.accountHolder}
+                                onChange={(e) => setBankForm({ ...bankForm, accountHolder: e.target.value })}
+                                data-testid="input-account-holder"
+                              />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <Label htmlFor="accountNumber">Account Number *</Label>
+                                <Input
+                                  id="accountNumber"
+                                  placeholder="e.g., 1234567890"
+                                  value={bankForm.accountNumber}
+                                  onChange={(e) => setBankForm({ ...bankForm, accountNumber: e.target.value })}
+                                  data-testid="input-account-number"
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label htmlFor="branchCode">Branch Code *</Label>
+                                <Input
+                                  id="branchCode"
+                                  placeholder="e.g., 250655"
+                                  value={bankForm.branchCode}
+                                  onChange={(e) => setBankForm({ ...bankForm, branchCode: e.target.value })}
+                                  data-testid="input-branch-code"
+                                />
+                              </div>
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label htmlFor="accountType">Account Type *</Label>
+                              <Select
+                                value={bankForm.accountType}
+                                onValueChange={(value) => setBankForm({ ...bankForm, accountType: value })}
+                              >
+                                <SelectTrigger data-testid="select-account-type">
+                                  <SelectValue placeholder="Select account type" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="savings">Savings Account</SelectItem>
+                                  <SelectItem value="current">Current Account</SelectItem>
+                                  <SelectItem value="cheque">Cheque Account</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+
+                          <div className="pt-4 border-t">
+                            <Button
+                              onClick={saveBankDetails}
+                              disabled={savingBankDetails}
+                              className="w-full"
+                              data-testid="button-save-bank-details"
+                            >
+                              {savingBankDetails ? 'Saving...' : bankDetails ? 'Update Bank Details' : 'Save Bank Details'}
+                            </Button>
+                          </div>
+
+                          <div className="p-4 bg-slate-50 rounded-lg text-sm text-slate-600">
+                            <p className="font-medium mb-2">Payment Information:</p>
+                            <ul className="space-y-1 text-slate-500">
+                              <li>• Payments are processed after job completion</li>
+                              <li>• 20% platform fee is deducted from each payment</li>
+                              <li>• Payments typically arrive within 2-3 business days</li>
+                              <li>• Minimum withdrawal amount: R100</li>
+                            </ul>
+                          </div>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+              </TabsContent>
+            )}
           </Tabs>
         </div>
       </div>
