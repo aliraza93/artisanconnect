@@ -57,6 +57,7 @@ export interface IStorage {
 
   // Quotes
   createQuote(quote: InsertQuote): Promise<Quote>;
+  getQuote(id: string): Promise<Quote | undefined>;
   getQuotesByJob(jobId: string): Promise<Quote[]>;
   getQuotesByArtisan(artisanId: string): Promise<Quote[]>;
   updateQuote(id: string, updates: Partial<Quote>): Promise<Quote | undefined>;
@@ -166,6 +167,11 @@ export class DatabaseStorage implements IStorage {
   async createQuote(quote: InsertQuote): Promise<Quote> {
     const [created] = await db.insert(quotes).values(quote).returning();
     return created;
+  }
+
+  async getQuote(id: string): Promise<Quote | undefined> {
+    const [quote] = await db.select().from(quotes).where(eq(quotes.id, id));
+    return quote || undefined;
   }
 
   async getQuotesByJob(jobId: string): Promise<Quote[]> {

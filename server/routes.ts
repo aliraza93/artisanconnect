@@ -628,5 +628,178 @@ export async function registerRoutes(
     }
   });
 
+  // ==================== Stripe Payment Routes ====================
+  
+  // Get Stripe publishable key
+  app.get("/api/stripe/config", async (req: Request, res: Response) => {
+    try {
+      const { getStripePublishableKey } = await import('./stripeClient');
+      const publishableKey = await getStripePublishableKey();
+      res.json({ publishableKey });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to get Stripe config" });
+    }
+  });
+
+  // Create payment intent for escrow (when quote is accepted)
+  app.post("/api/payments/create-intent", isAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const user = req.user as User;
+      const { quoteId } = req.body;
+      
+      // Get the quote and job details
+      const quote = await storage.getQuote(quoteId);
+      if (!quote) {
+        return res.status(404).json({ error: "Quote not found" });
+      }
+      
+      const job = await storage.getJob(quote.jobId);
+      if (!job || job.clientId !== user.id) {
+        return res.status(403).json({ error: "Unauthorized" });
+      }
+      
+      const { stripeService } = await import('./stripeService');
+      const { getUncachableStripeClient } = await import('./stripeClient');
+      const stripe = await getUncachableStripeClient();
+      
+      // Create or get Stripe customer
+      let customerId = user.stripeCustomerId;
+      if (!customerId) {
+        const customer = await stripeService.createCustomer(user.email, user.id, user.fullName);
+        await storage.updateUser(user.id, { stripeCustomerId: customer.id });
+        customerId = customer.id;
+      }
+      
+      // Convert amount to cents (ZAR uses cents)
+      const amountInCents = Math.round(parseFloat(quote.amount) * 100);
+      
+      // Create payment intent
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: amountInCents,
+        currency: 'zar',
+        customer: customerId,
+        metadata: {
+          quoteId: quote.id,
+          jobId: job.id,
+          artisanId: quote.artisanId,
+          clientId: user.id,
+        },
+        capture_method: 'manual', // For escrow - authorize but don't capture
+      });
+      
+      res.json({ 
+        clientSecret: paymentIntent.client_secret,
+        paymentIntentId: paymentIntent.id 
+      });
+    } catch (error: any) {
+      console.error('Payment intent error:', error);
+      res.status(500).json({ error: error.message || "Failed to create payment intent" });
+    }
+  });
+
+  // Confirm payment and accept quote (after successful Stripe payment)
+  app.post("/api/payments/confirm", isAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const user = req.user as User;
+      const { paymentIntentId, quoteId } = req.body;
+      
+      const { getUncachableStripeClient } = await import('./stripeClient');
+      const stripe = await getUncachableStripeClient();
+      
+      // Verify payment intent
+      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+      if (paymentIntent.status !== 'requires_capture') {
+        return res.status(400).json({ error: "Payment not authorized" });
+      }
+      
+      // Get quote and verify ownership
+      const quote = await storage.getQuote(quoteId);
+      if (!quote) {
+        return res.status(404).json({ error: "Quote not found" });
+      }
+      
+      const job = await storage.getJob(quote.jobId);
+      if (!job || job.clientId !== user.id) {
+        return res.status(403).json({ error: "Unauthorized" });
+      }
+      
+      // Calculate platform fee (20%)
+      const totalAmount = parseFloat(quote.amount);
+      const platformFee = totalAmount * 0.20;
+      const artisanAmount = totalAmount - platformFee;
+      
+      // Update quote to accepted
+      await storage.updateQuote(quote.id, { status: 'accepted' });
+      
+      // Update job status
+      await storage.updateJob(job.id, { status: 'in_progress' });
+      
+      // Create payment record with escrow status
+      const payment = await storage.createPayment({
+        jobId: job.id,
+        clientId: user.id,
+        artisanId: quote.artisanId,
+        totalAmount: totalAmount.toString(),
+        platformFee: platformFee.toString(),
+        artisanAmount: artisanAmount.toString(),
+        status: 'held_escrow',
+        stripePaymentIntentId: paymentIntentId,
+      });
+      
+      res.json({ 
+        success: true, 
+        payment,
+        message: "Payment held in escrow. Will be released upon job completion." 
+      });
+    } catch (error: any) {
+      console.error('Payment confirm error:', error);
+      res.status(500).json({ error: error.message || "Failed to confirm payment" });
+    }
+  });
+
+  // Release payment from escrow (client approves completed work)
+  app.post("/api/payments/:id/release", isAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const user = req.user as User;
+      const paymentId = req.params.id;
+      
+      const payment = await storage.getPayment(paymentId);
+      if (!payment) {
+        return res.status(404).json({ error: "Payment not found" });
+      }
+      
+      // Only client or admin can release
+      if (payment.clientId !== user.id && user.role !== 'admin') {
+        return res.status(403).json({ error: "Unauthorized" });
+      }
+      
+      if (payment.status !== 'held_escrow') {
+        return res.status(400).json({ error: "Payment is not in escrow" });
+      }
+      
+      const { getUncachableStripeClient } = await import('./stripeClient');
+      const stripe = await getUncachableStripeClient();
+      
+      // Capture the payment
+      if (payment.stripePaymentIntentId) {
+        await stripe.paymentIntents.capture(payment.stripePaymentIntentId);
+      }
+      
+      // Update payment status
+      await storage.updatePayment(paymentId, { 
+        status: 'released',
+        escrowReleaseDate: new Date()
+      });
+      
+      // Update job status
+      await storage.updateJob(payment.jobId, { status: 'completed' });
+      
+      res.json({ success: true, message: "Payment released successfully" });
+    } catch (error: any) {
+      console.error('Payment release error:', error);
+      res.status(500).json({ error: error.message || "Failed to release payment" });
+    }
+  });
+
   return httpServer;
 }

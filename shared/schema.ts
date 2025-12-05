@@ -19,7 +19,8 @@ export const users = pgTable('users', {
   phone: text(),
   role: userRoleEnum().notNull().default('client'),
   verified: boolean().notNull().default(false),
-  rating: text().default('0'), // Using text to avoid decimal issues, can parse as float
+  rating: text().default('0'),
+  stripeCustomerId: text(),
   createdAt: timestamp().notNull().defaultNow(),
 });
 
@@ -86,9 +87,10 @@ export const payments = pgTable('payments', {
   clientId: varchar().notNull().references(() => users.id),
   artisanId: varchar().notNull().references(() => users.id),
   totalAmount: text().notNull(),
-  platformFee: text().notNull(), // 20% of totalAmount
-  artisanAmount: text().notNull(), // 80% of totalAmount
+  platformFee: text().notNull(),
+  artisanAmount: text().notNull(),
   status: paymentStatusEnum().notNull().default('pending'),
+  stripePaymentIntentId: text(),
   escrowReleaseDate: timestamp(),
   createdAt: timestamp().notNull().defaultNow(),
 });
