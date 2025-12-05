@@ -6,6 +6,7 @@ import session from "express-session";
 import connectPg from "connect-pg-simple";
 import passport from "./auth";
 import { pool } from "./db";
+import { setupWebSocket } from "./websocket";
 
 const app = express();
 const httpServer = createServer(app);
@@ -88,6 +89,7 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  setupWebSocket(httpServer);
   await registerRoutes(httpServer, app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

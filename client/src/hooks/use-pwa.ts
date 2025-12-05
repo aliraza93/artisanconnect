@@ -1,0 +1,75 @@
+import { useState, useEffect, useCallback } from 'react';
+
+interface BeforeInstallPromptEvent extends Event {
+  readonly platforms: string[];
+  readonly userChoice: Promise<{
+    outcome: 'accepted' | 'dismissed';
+    platform: string;
+  }>;
+  prompt(): Promise<void>;
+}
+
+export function usePWA() {
+  const [canInstall, setCanInstall] = useState(false);
+  const [isInstalled, setIsInstalled] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+
+  useEffect(() => {
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+      setIsInstalled(true);
+      return;
+    }
+
+    if ((navigator as any).standalone === true) {
+      setIsInstalled(true);
+      return;
+    }
+
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e as BeforeInstallPromptEvent);
+      setCanInstall(true);
+    };
+
+    const handleAppInstalled = () => {
+      setIsInstalled(true);
+      setCanInstall(false);
+      setDeferredPrompt(null);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('appinstalled', handleAppInstalled);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', handleAppInstalled);
+    };
+  }, []);
+
+  const install = useCallback(async () => {
+    if (!deferredPrompt) {
+      return false;
+    }
+
+    try {
+      await deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      
+      if (outcome === 'accepted') {
+        setCanInstall(false);
+        setDeferredPrompt(null);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('PWA install error:', error);
+      return false;
+    }
+  }, [deferredPrompt]);
+
+  return {
+    canInstall,
+    isInstalled,
+    install,
+  };
+}
