@@ -8,7 +8,8 @@ ArtisanConnect SA is a production-ready Progressive Web App (PWA) marketplace co
 
 ## Recent Changes
 
-### December 5, 2025 - Hourly Billing & Platform Enhancements
+### December 5, 2025 - Hourly Billing, Password Reset & Platform Enhancements
+- ✅ **Password reset with OTP** - Users can reset passwords via email OTP (Resend integration)
 - ✅ **Hourly billing system** - Artisans can now charge by the hour with estimated times
 - ✅ **Time tracking** - Clients record actual hours worked for accurate billing
 - ✅ **Dynamic payment calculation** - Final payout = hourly rate × actual hours
@@ -20,7 +21,6 @@ ArtisanConnect SA is a production-ready Progressive Web App (PWA) marketplace co
 - ✅ Object storage for job images using Replit's built-in storage
 - ✅ Image upload component (client/src/components/ObjectUploader.tsx)
 - ✅ Job posting page with image upload support
-- ⏭️ Email notifications (SendGrid) - User dismissed integration
 - ⏭️ SMS notifications (Twilio) - User dismissed integration
 
 ### December 4, 2025 - Full Frontend-Backend Integration Complete

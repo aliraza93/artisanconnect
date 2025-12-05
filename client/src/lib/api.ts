@@ -118,6 +118,12 @@ export interface BankDetails {
   updatedAt: string;
 }
 
+// Password Reset Types
+export interface PasswordResetResponse {
+  success: boolean;
+  message: string;
+}
+
 export interface Withdrawal {
   id: string;
   userId: string;
@@ -198,6 +204,28 @@ class ApiClient {
 
   async getCurrentUser(): Promise<User> {
     return this.request<User>('/auth/me');
+  }
+
+  // Password Reset
+  async requestPasswordReset(email: string): Promise<PasswordResetResponse> {
+    return this.request<PasswordResetResponse>('/auth/request-reset', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  }
+
+  async verifyOTP(email: string, otp: string): Promise<PasswordResetResponse> {
+    return this.request<PasswordResetResponse>('/auth/verify-otp', {
+      method: 'POST',
+      body: JSON.stringify({ email, otp }),
+    });
+  }
+
+  async resetPassword(email: string, otp: string, newPassword: string): Promise<PasswordResetResponse> {
+    return this.request<PasswordResetResponse>('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ email, otp, newPassword }),
+    });
   }
 
   // Jobs
