@@ -21,6 +21,10 @@ ArtisanConnect SA is a production-ready Progressive Web App (PWA) marketplace co
 - ✅ Object storage for job images using Replit's built-in storage
 - ✅ Image upload component (client/src/components/ObjectUploader.tsx)
 - ✅ Job posting page with image upload support
+- ✅ **Welcome email on signup** - Sends personalized welcome email via Resend
+- ✅ **Bank details for artisans** - Payment Settings tab in artisan dashboard
+- ✅ **Session cookie fix** - Added sameSite attribute for production
+- ✅ **Custom PWA icons** - User's ArtisanConnect logo for app icons
 - ⏭️ SMS notifications (Twilio) - User dismissed integration
 
 ### December 4, 2025 - Full Frontend-Backend Integration Complete

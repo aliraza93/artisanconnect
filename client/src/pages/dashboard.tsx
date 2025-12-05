@@ -128,11 +128,8 @@ export default function Dashboard() {
     
     setLoadingBankDetails(true);
     try {
-      const response = await fetch('/api/bank-details', {
-        credentials: 'include',
-      });
-      if (response.ok) {
-        const data = await response.json();
+      const data = await api.getBankDetails();
+      if (data) {
         setBankDetails(data);
         setBankForm({
           bankName: data.bankName || '',
@@ -151,6 +148,7 @@ export default function Dashboard() {
 
   // Save bank details
   const saveBankDetails = async () => {
+    // Validate required fields
     if (!bankForm.bankName || !bankForm.accountHolder || !bankForm.accountNumber || !bankForm.branchCode) {
       toast({
         title: "Missing information",
@@ -160,21 +158,35 @@ export default function Dashboard() {
       return;
     }
 
+    // Validate account number format (only digits, 6-16 characters)
+    const accountNumberClean = bankForm.accountNumber.replace(/\s/g, '');
+    if (!/^\d{6,16}$/.test(accountNumberClean)) {
+      toast({
+        title: "Invalid account number",
+        description: "Account number must be 6-16 digits.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate branch code format (6 digits for SA banks)
+    const branchCodeClean = bankForm.branchCode.replace(/\s/g, '');
+    if (!/^\d{6}$/.test(branchCodeClean)) {
+      toast({
+        title: "Invalid branch code",
+        description: "Branch code must be 6 digits.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setSavingBankDetails(true);
     try {
-      const response = await fetch('/api/bank-details', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(bankForm),
+      const saved = await api.saveBankDetails({
+        ...bankForm,
+        accountNumber: accountNumberClean,
+        branchCode: branchCodeClean,
       });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to save bank details');
-      }
-
-      const saved = await response.json();
       setBankDetails(saved);
       toast({
         title: "Bank details saved!",
