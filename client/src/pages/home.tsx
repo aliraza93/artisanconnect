@@ -164,7 +164,7 @@ export default function Home() {
                   </div>
                   <div>
                     <h3 className="text-xl font-bold mb-2 text-white">Skilled Artisans</h3>
-                    <p className="text-slate-400">Plumbers, electricians, builders, painters. Verified qualifications and reviews.</p>
+                    <p className="text-slate-400">Plumbers, electricians, builders, solar installers, HVAC techs, and more. Verified qualifications and reviews.</p>
                   </div>
                 </div>
                 

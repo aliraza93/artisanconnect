@@ -180,6 +180,12 @@ export function SignupModal({ open, onOpenChange, onSwitchToLogin }: SignupModal
                     <SelectItem value="carpenter">Carpenter</SelectItem>
                     <SelectItem value="painter">Painter</SelectItem>
                     <SelectItem value="hvac">HVAC Technician</SelectItem>
+                    <SelectItem value="welder">Welder</SelectItem>
+                    <SelectItem value="architect">Architect</SelectItem>
+                    <SelectItem value="cctv">CCTV Technician</SelectItem>
+                    <SelectItem value="automation">Automation Specialist</SelectItem>
+                    <SelectItem value="solar">Solar Installer</SelectItem>
+                    <SelectItem value="generators">Generator Technician</SelectItem>
                     <SelectItem value="general">General Handyman</SelectItem>
                   </SelectContent>
                 </Select>

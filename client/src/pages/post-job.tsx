@@ -154,6 +154,13 @@ export default function PostJob() {
                       <SelectItem value="electrician">Electrical</SelectItem>
                       <SelectItem value="carpenter">Building & Renovation</SelectItem>
                       <SelectItem value="painter">Painting</SelectItem>
+                      <SelectItem value="hvac">HVAC</SelectItem>
+                      <SelectItem value="welder">Welding</SelectItem>
+                      <SelectItem value="architect">Architecture</SelectItem>
+                      <SelectItem value="cctv">CCTV & Security</SelectItem>
+                      <SelectItem value="automation">Home Automation</SelectItem>
+                      <SelectItem value="solar">Solar Installation</SelectItem>
+                      <SelectItem value="generators">Generators</SelectItem>
                       <SelectItem value="logistics">Logistics & Transport</SelectItem>
                       <SelectItem value="general">General Handyman</SelectItem>
                     </SelectContent>
