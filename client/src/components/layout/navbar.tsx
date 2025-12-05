@@ -1,6 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Hammer, Menu, X, LogOut, User } from "lucide-react";
+import { Menu, X, LogOut, User } from "lucide-react";
+import logoImage from "@assets/AC_1764929686540.png";
 import { useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -48,15 +49,10 @@ export function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16 items-center">
           {/* Logo */}
-          <div className="flex-shrink-0 flex items-center gap-2">
+          <div className="flex-shrink-0 flex items-center">
             <Link href="/">
-              <div className="flex items-center gap-2 cursor-pointer">
-                <div className="bg-primary p-1.5 rounded-lg text-white">
-                  <Hammer className="h-6 w-6" />
-                </div>
-                <span className="font-heading font-bold text-xl text-foreground">
-                  ArtisanConnect<span className="text-primary">SA</span>
-                </span>
+              <div className="flex items-center cursor-pointer">
+                <img src={logoImage} alt="ArtisanConnect SA" className="h-12 w-auto" />
               </div>
             </Link>
           </div>
