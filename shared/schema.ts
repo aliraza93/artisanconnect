@@ -9,6 +9,7 @@ export const jobStatusEnum = pgEnum('job_status', ['open', 'quoted', 'in_progres
 export const quoteStatusEnum = pgEnum('quote_status', ['pending', 'accepted', 'rejected']);
 export const paymentStatusEnum = pgEnum('payment_status', ['pending', 'held_escrow', 'released', 'refunded']);
 export const disputeStatusEnum = pgEnum('dispute_status', ['open', 'investigating', 'resolved', 'closed']);
+export const billingTypeEnum = pgEnum('billing_type', ['fixed', 'hourly']);
 
 // Users Table
 export const users = pgTable('users', {
@@ -74,6 +75,9 @@ export const quotes = pgTable('quotes', {
   amount: text().notNull(),
   message: text(),
   status: quoteStatusEnum().notNull().default('pending'),
+  billingType: billingTypeEnum().notNull().default('fixed'),
+  hourlyRate: text(),
+  estimatedHours: text(),
   createdAt: timestamp().notNull().defaultNow(),
 });
 
@@ -93,6 +97,11 @@ export const payments = pgTable('payments', {
   status: paymentStatusEnum().notNull().default('pending'),
   stripePaymentIntentId: text(),
   escrowReleaseDate: timestamp(),
+  billingType: billingTypeEnum().notNull().default('fixed'),
+  hourlyRate: text(),
+  estimatedHours: text(),
+  actualHours: text(),
+  finalTotal: text(),
   createdAt: timestamp().notNull().defaultNow(),
 });
 

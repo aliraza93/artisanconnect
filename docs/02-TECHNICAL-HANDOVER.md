@@ -256,7 +256,39 @@ payment_status: 'pending' | 'held_escrow' | 'released' | 'refunded'
 
 -- Dispute statuses
 dispute_status: 'open' | 'investigating' | 'resolved' | 'closed'
+
+-- Billing types (for quotes and payments)
+billing_type: 'fixed' | 'hourly'
 ```
+
+### Hourly Billing Support
+
+The platform supports two billing types for artisan quotes:
+
+**Fixed Price (`fixed`)**
+- Traditional one-time quote amount
+- Client pays the agreed amount upon job completion
+- Amount is held in escrow until work is complete
+
+**Hourly Rate (`hourly`)**
+- Artisan specifies hourly rate and estimated hours
+- Estimated total = hourly_rate × estimated_hours
+- Client records actual hours worked after job completion
+- Final payment = hourly_rate × actual_hours
+- 20% platform fee applies to the final amount
+
+**Database Fields for Hourly Billing:**
+
+| Table | Field | Description |
+|-------|-------|-------------|
+| quotes | billing_type | 'fixed' or 'hourly' |
+| quotes | hourly_rate | Rate per hour (for hourly quotes) |
+| quotes | estimated_hours | Estimated hours for the job |
+| payments | billing_type | Inherited from accepted quote |
+| payments | hourly_rate | Rate per hour |
+| payments | estimated_hours | Original estimate |
+| payments | actual_hours | Client-recorded actual hours |
+| payments | final_total | Calculated from actual hours |
 
 ### Schema Migrations
 
@@ -342,12 +374,24 @@ Request:
 
 #### POST /api/quotes
 
-Request:
+**Fixed Price Quote:**
 ```json
 {
   "jobId": "uuid",
+  "billingType": "fixed",
   "amount": "450",
   "message": "I can fix this within 2 hours"
+}
+```
+
+**Hourly Rate Quote:**
+```json
+{
+  "jobId": "uuid",
+  "billingType": "hourly",
+  "hourlyRate": "350",
+  "estimatedHours": "4",
+  "message": "Estimate 4 hours, will charge actual time"
 }
 ```
 
@@ -356,7 +400,37 @@ Request:
 | Method | Endpoint | Description | Auth Required |
 |--------|----------|-------------|---------------|
 | GET | `/api/jobs/:jobId/payments` | Get job payments | Yes |
-| PATCH | `/api/payments/:id/release` | Release payment | Client/Admin |
+| GET | `/api/payments/:id` | Get single payment | Yes |
+| POST | `/api/payments/:id/record-hours` | Record actual hours (hourly billing) | Client |
+| POST | `/api/payments/:id/release` | Release payment from escrow | Client/Admin |
+
+#### POST /api/payments/:id/record-hours
+
+For hourly billing, client records actual hours worked before releasing payment.
+
+Request:
+```json
+{
+  "actualHours": "5.5"
+}
+```
+
+Response:
+```json
+{
+  "success": true,
+  "payment": { ... },
+  "summary": {
+    "hourlyRate": 350,
+    "actualHours": 5.5,
+    "estimatedHours": 4,
+    "finalTotal": "1925.00",
+    "platformFee": "385.00",
+    "artisanAmount": "1540.00"
+  },
+  "message": "Actual hours recorded. You can now release the payment."
+}
+```
 
 ### Message Endpoints
 

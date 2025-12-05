@@ -49,6 +49,9 @@ export interface Quote {
   amount: string;
   message: string | null;
   status: 'pending' | 'accepted' | 'rejected';
+  billingType: 'fixed' | 'hourly';
+  hourlyRate: string | null;
+  estimatedHours: string | null;
   createdAt: string;
 }
 
@@ -62,6 +65,11 @@ export interface Payment {
   artisanAmount: string;
   status: 'pending' | 'held_escrow' | 'released' | 'refunded';
   escrowReleaseDate: string | null;
+  billingType: 'fixed' | 'hourly';
+  hourlyRate: string | null;
+  estimatedHours: string | null;
+  actualHours: string | null;
+  finalTotal: string | null;
   createdAt: string;
 }
 
@@ -229,7 +237,10 @@ class ApiClient {
   // Quotes
   async createQuote(data: {
     jobId: string;
-    amount: string;
+    billingType: 'fixed' | 'hourly';
+    amount?: string;
+    hourlyRate?: string;
+    estimatedHours?: string;
     message?: string;
   }): Promise<Quote> {
     return this.request<Quote>('/quotes', {
@@ -257,10 +268,33 @@ class ApiClient {
     return this.request<Payment[]>(`/jobs/${jobId}/payments`);
   }
 
-  async releasePayment(paymentId: string): Promise<Payment> {
-    return this.request<Payment>(`/payments/${paymentId}/release`, {
-      method: 'PATCH',
+  async releasePayment(paymentId: string): Promise<{ success: boolean; message: string }> {
+    return this.request<{ success: boolean; message: string }>(`/payments/${paymentId}/release`, {
+      method: 'POST',
     });
+  }
+
+  async recordActualHours(paymentId: string, actualHours: string): Promise<{
+    success: boolean;
+    payment: Payment;
+    summary: {
+      hourlyRate: number;
+      actualHours: number;
+      estimatedHours: number;
+      finalTotal: string;
+      platformFee: string;
+      artisanAmount: string;
+    };
+    message: string;
+  }> {
+    return this.request(`/payments/${paymentId}/record-hours`, {
+      method: 'POST',
+      body: JSON.stringify({ actualHours }),
+    });
+  }
+
+  async getPayment(paymentId: string): Promise<Payment> {
+    return this.request<Payment>(`/payments/${paymentId}`);
   }
 
   async getPlatformRevenue(): Promise<{ revenue: number }> {

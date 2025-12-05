@@ -4,11 +4,16 @@
 ArtisanConnect SA is a production-ready Progressive Web App (PWA) marketplace connecting South African homeowners with vetted artisans (plumbers, electricians) and logistics providers. The platform uses Donald Miller's StoryBrand framework for messaging, emphasizing trust, competence, and ease of use.
 
 **Platform Model:** 20% commission on all transactions with escrow payment system  
-**Last Updated:** December 4, 2025
+**Last Updated:** December 5, 2025
 
 ## Recent Changes
 
-### December 5, 2025 - Platform Enhancements
+### December 5, 2025 - Hourly Billing & Platform Enhancements
+- ✅ **Hourly billing system** - Artisans can now charge by the hour with estimated times
+- ✅ **Time tracking** - Clients record actual hours worked for accurate billing
+- ✅ **Dynamic payment calculation** - Final payout = hourly rate × actual hours
+- ✅ Quote submission UI with fixed/hourly toggle
+- ✅ Job completion UI for recording actual hours
 - ✅ WebSocket real-time messaging infrastructure (server/websocket.ts, client/src/lib/websocket.tsx)
 - ✅ PWA configuration complete (manifest.json, service worker, install prompt, offline support)
 - ✅ Stripe payment integration with escrow system

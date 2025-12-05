@@ -193,17 +193,48 @@ export async function registerRoutes(
   app.post("/api/quotes", requireArtisan, async (req: Request, res: Response) => {
     try {
       const user = req.user as User;
-      const validatedData = insertQuoteSchema.parse({
-        ...req.body,
-        artisanId: user.id,
-      });
+      const { billingType, hourlyRate, estimatedHours, amount, ...rest } = req.body;
       
-      const quote = await storage.createQuote(validatedData);
-      
-      // Update job status to 'quoted'
-      await storage.updateJob(validatedData.jobId, { status: 'quoted' });
-      
-      res.status(201).json(quote);
+      // Validate hourly billing fields
+      if (billingType === 'hourly') {
+        if (!hourlyRate || parseFloat(hourlyRate) <= 0) {
+          return res.status(400).json({ error: "Hourly rate must be a positive number" });
+        }
+        if (!estimatedHours || parseFloat(estimatedHours) <= 0) {
+          return res.status(400).json({ error: "Estimated hours must be a positive number" });
+        }
+        // Calculate total amount from hourly rate × estimated hours
+        const calculatedAmount = (parseFloat(hourlyRate) * parseFloat(estimatedHours)).toFixed(2);
+        
+        const validatedData = insertQuoteSchema.parse({
+          ...rest,
+          artisanId: user.id,
+          billingType: 'hourly',
+          hourlyRate: hourlyRate.toString(),
+          estimatedHours: estimatedHours.toString(),
+          amount: calculatedAmount,
+        });
+        
+        const quote = await storage.createQuote(validatedData);
+        await storage.updateJob(validatedData.jobId, { status: 'quoted' });
+        res.status(201).json(quote);
+      } else {
+        // Fixed price quote
+        if (!amount || parseFloat(amount) <= 0) {
+          return res.status(400).json({ error: "Quote amount must be a positive number" });
+        }
+        
+        const validatedData = insertQuoteSchema.parse({
+          ...rest,
+          artisanId: user.id,
+          billingType: 'fixed',
+          amount: amount.toString(),
+        });
+        
+        const quote = await storage.createQuote(validatedData);
+        await storage.updateJob(validatedData.jobId, { status: 'quoted' });
+        res.status(201).json(quote);
+      }
     } catch (error: any) {
       res.status(400).json({ error: error.message || "Failed to create quote" });
     }
@@ -270,6 +301,27 @@ export async function registerRoutes(
       res.json(payments);
     } catch (error: any) {
       res.status(500).json({ error: "Failed to fetch payments" });
+    }
+  });
+
+  // Get single payment
+  app.get("/api/payments/:id", isAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const user = req.user as User;
+      const payment = await storage.getPayment(req.params.id);
+      
+      if (!payment) {
+        return res.status(404).json({ error: "Payment not found" });
+      }
+      
+      // Only client, artisan, or admin can view
+      if (payment.clientId !== user.id && payment.artisanId !== user.id && user.role !== 'admin') {
+        return res.status(403).json({ error: "Unauthorized" });
+      }
+      
+      res.json(payment);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch payment" });
     }
   });
 
@@ -734,7 +786,7 @@ export async function registerRoutes(
       // Update job status
       await storage.updateJob(job.id, { status: 'in_progress' });
       
-      // Create payment record with escrow status
+      // Create payment record with escrow status and hourly billing data
       const payment = await storage.createPayment({
         jobId: job.id,
         clientId: user.id,
@@ -744,16 +796,91 @@ export async function registerRoutes(
         artisanAmount: artisanAmount.toString(),
         status: 'held_escrow',
         stripePaymentIntentId: paymentIntentId,
+        billingType: quote.billingType || 'fixed',
+        hourlyRate: quote.hourlyRate,
+        estimatedHours: quote.estimatedHours,
       });
       
+      const isHourly = quote.billingType === 'hourly';
       res.json({ 
         success: true, 
         payment,
-        message: "Payment held in escrow. Will be released upon job completion." 
+        message: isHourly 
+          ? "Estimated payment held in escrow. Final amount will be calculated based on actual hours worked." 
+          : "Payment held in escrow. Will be released upon job completion." 
       });
     } catch (error: any) {
       console.error('Payment confirm error:', error);
       res.status(500).json({ error: error.message || "Failed to confirm payment" });
+    }
+  });
+  
+  // Record actual hours worked (for hourly billing - client only)
+  app.post("/api/payments/:id/record-hours", requireClient, async (req: Request, res: Response) => {
+    try {
+      const user = req.user as User;
+      const paymentId = req.params.id;
+      const { actualHours } = req.body;
+      
+      if (!actualHours || parseFloat(actualHours) <= 0) {
+        return res.status(400).json({ error: "Actual hours must be a positive number" });
+      }
+      
+      const payment = await storage.getPayment(paymentId);
+      if (!payment) {
+        return res.status(404).json({ error: "Payment not found" });
+      }
+      
+      // Only client can record hours
+      if (payment.clientId !== user.id) {
+        return res.status(403).json({ error: "Unauthorized" });
+      }
+      
+      if (payment.status !== 'held_escrow') {
+        return res.status(400).json({ error: "Payment is not in escrow" });
+      }
+      
+      if (payment.billingType !== 'hourly') {
+        return res.status(400).json({ error: "This payment is not hourly-based" });
+      }
+      
+      if (payment.actualHours) {
+        return res.status(400).json({ error: "Actual hours have already been recorded. Open a dispute if you need to change this." });
+      }
+      
+      // Calculate final total based on actual hours
+      const hourlyRate = parseFloat(payment.hourlyRate || '0');
+      const hours = parseFloat(actualHours);
+      const finalTotal = hourlyRate * hours;
+      const platformFee = finalTotal * 0.20;
+      const artisanAmount = finalTotal - platformFee;
+      
+      await storage.updatePayment(paymentId, {
+        actualHours: actualHours.toString(),
+        finalTotal: finalTotal.toFixed(2),
+        totalAmount: finalTotal.toFixed(2),
+        platformFee: platformFee.toFixed(2),
+        artisanAmount: artisanAmount.toFixed(2),
+      });
+      
+      const updatedPayment = await storage.getPayment(paymentId);
+      
+      res.json({ 
+        success: true, 
+        payment: updatedPayment,
+        summary: {
+          hourlyRate,
+          actualHours: hours,
+          estimatedHours: parseFloat(payment.estimatedHours || '0'),
+          finalTotal: finalTotal.toFixed(2),
+          platformFee: platformFee.toFixed(2),
+          artisanAmount: artisanAmount.toFixed(2),
+        },
+        message: "Actual hours recorded. You can now release the payment." 
+      });
+    } catch (error: any) {
+      console.error('Record hours error:', error);
+      res.status(500).json({ error: error.message || "Failed to record hours" });
     }
   });
 
@@ -777,24 +904,44 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Payment is not in escrow" });
       }
       
+      // For hourly billing, ensure actual hours have been recorded
+      if (payment.billingType === 'hourly' && !payment.actualHours) {
+        return res.status(400).json({ error: "Please record actual hours worked before releasing payment" });
+      }
+      
       const { getUncachableStripeClient } = await import('./stripeClient');
       const stripe = await getUncachableStripeClient();
       
+      // For hourly billing, use the finalTotal; for fixed, use totalAmount
+      const releaseAmount = payment.billingType === 'hourly' && payment.finalTotal
+        ? payment.finalTotal
+        : payment.totalAmount;
+      
       // Capture the payment
       if (payment.stripePaymentIntentId) {
-        await stripe.paymentIntents.capture(payment.stripePaymentIntentId);
+        // For hourly billing, we may need to capture a different amount
+        await stripe.paymentIntents.capture(payment.stripePaymentIntentId, {
+          amount_to_capture: Math.round(parseFloat(releaseAmount) * 100),
+        });
       }
       
-      // Update payment status
+      // Update payment status with final amounts
       await storage.updatePayment(paymentId, { 
         status: 'released',
-        escrowReleaseDate: new Date()
+        escrowReleaseDate: new Date(),
+        totalAmount: releaseAmount,
       });
       
       // Update job status
       await storage.updateJob(payment.jobId, { status: 'completed' });
       
-      res.json({ success: true, message: "Payment released successfully" });
+      const isHourly = payment.billingType === 'hourly';
+      res.json({ 
+        success: true, 
+        message: isHourly 
+          ? `Payment of R${releaseAmount} released based on ${payment.actualHours} hours worked.`
+          : "Payment released successfully" 
+      });
     } catch (error: any) {
       console.error('Payment release error:', error);
       res.status(500).json({ error: error.message || "Failed to release payment" });
