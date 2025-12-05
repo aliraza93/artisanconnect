@@ -55,6 +55,46 @@ export async function registerRoutes(
         });
       }
 
+      // Send welcome email
+      if (process.env.RESEND_API_KEY) {
+        try {
+          const resend = new Resend(process.env.RESEND_API_KEY);
+          const roleWelcome = user.role === 'artisan' 
+            ? 'You can now browse available jobs and submit quotes to clients.'
+            : user.role === 'logistics'
+            ? 'You can now view logistics jobs and offer your delivery services.'
+            : 'You can now post jobs and connect with trusted artisans.';
+          
+          await resend.emails.send({
+            from: 'ArtisanConnect SA <onboarding@resend.dev>',
+            to: user.email,
+            subject: 'Welcome to ArtisanConnect SA!',
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+                <h2 style="color: #2563EB;">Welcome to ArtisanConnect SA!</h2>
+                <p>Hello ${user.fullName},</p>
+                <p>Thank you for joining ArtisanConnect SA - South Africa's trusted marketplace connecting homeowners with skilled artisans.</p>
+                <p><strong>${roleWelcome}</strong></p>
+                <div style="background-color: #f3f4f6; padding: 20px; margin: 20px 0; border-radius: 8px;">
+                  <h3 style="color: #2563EB; margin-top: 0;">What's Next?</h3>
+                  <ul style="color: #374151;">
+                    <li>Complete your profile to build trust</li>
+                    <li>Explore the platform features</li>
+                    <li>Start connecting with ${user.role === 'client' ? 'artisans' : 'clients'}</li>
+                  </ul>
+                </div>
+                <p>If you have any questions, feel free to reach out to our support team.</p>
+                <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+                <p style="color: #999; font-size: 12px;">ArtisanConnect SA - Connecting Homeowners with Trusted Artisans</p>
+              </div>
+            `,
+          });
+        } catch (emailError) {
+          console.error('Failed to send welcome email:', emailError);
+          // Don't fail signup if email fails
+        }
+      }
+
       // Log in the user
       req.login(user, (err) => {
         if (err) {
