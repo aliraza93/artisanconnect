@@ -163,7 +163,7 @@ export async function registerRoutes(
         const resend = new Resend(process.env.RESEND_API_KEY);
         
         await resend.emails.send({
-          from: 'ArtisanConnect SA <noreply@artisanconnect.co.za>',
+          from: 'ArtisanConnect SA <onboarding@resend.dev>',
           to: user.email,
           subject: 'Password Reset Code - ArtisanConnect SA',
           html: `
