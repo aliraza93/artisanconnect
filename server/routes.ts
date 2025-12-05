@@ -18,6 +18,7 @@ import {
   insertWithdrawalSchema,
   insertAdminRequestSchema,
 } from "@shared/schema";
+import { Resend } from 'resend';
 
 export async function registerRoutes(
   httpServer: Server,
@@ -112,6 +113,160 @@ export async function registerRoutes(
     }
     
     res.json(userWithoutPassword);
+  });
+
+  // ==================== Password Reset Routes ====================
+  
+  // Generate 6-digit OTP
+  function generateOTP(): string {
+    return Math.floor(100000 + Math.random() * 900000).toString();
+  }
+
+  // Request password reset - sends OTP to email
+  app.post("/api/auth/request-reset", async (req: Request, res: Response) => {
+    try {
+      const { email } = req.body;
+      
+      if (!email) {
+        return res.status(400).json({ error: "Email is required" });
+      }
+      
+      // Find user by email
+      const user = await storage.getUserByEmail(email.toLowerCase().trim());
+      
+      // Always return success to prevent email enumeration
+      if (!user) {
+        return res.json({ 
+          success: true, 
+          message: "If an account exists with this email, you will receive a password reset code." 
+        });
+      }
+      
+      // Invalidate any existing tokens for this user
+      await storage.invalidateUserPasswordResetTokens(user.id);
+      
+      // Generate OTP and expiry (15 minutes)
+      const otp = generateOTP();
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+      
+      // Save token
+      await storage.createPasswordResetToken({
+        userId: user.id,
+        email: user.email,
+        otp,
+        expiresAt,
+        used: false,
+      });
+      
+      // Send email with OTP
+      if (process.env.RESEND_API_KEY) {
+        const resend = new Resend(process.env.RESEND_API_KEY);
+        
+        await resend.emails.send({
+          from: 'ArtisanConnect SA <noreply@artisanconnect.co.za>',
+          to: user.email,
+          subject: 'Password Reset Code - ArtisanConnect SA',
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+              <h2 style="color: #2563EB;">Password Reset Request</h2>
+              <p>Hello ${user.fullName},</p>
+              <p>You requested to reset your password for ArtisanConnect SA. Use the code below to complete the reset:</p>
+              <div style="background-color: #f3f4f6; padding: 20px; text-align: center; margin: 20px 0; border-radius: 8px;">
+                <span style="font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #2563EB;">${otp}</span>
+              </div>
+              <p style="color: #666;">This code expires in 15 minutes.</p>
+              <p style="color: #666;">If you didn't request this, please ignore this email.</p>
+              <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+              <p style="color: #999; font-size: 12px;">ArtisanConnect SA - Connecting Homeowners with Trusted Artisans</p>
+            </div>
+          `,
+        });
+      }
+      
+      res.json({ 
+        success: true, 
+        message: "If an account exists with this email, you will receive a password reset code." 
+      });
+    } catch (error: any) {
+      console.error('Password reset request error:', error);
+      res.status(500).json({ error: "Failed to process password reset request" });
+    }
+  });
+
+  // Verify OTP
+  app.post("/api/auth/verify-otp", async (req: Request, res: Response) => {
+    try {
+      const { email, otp } = req.body;
+      
+      if (!email || !otp) {
+        return res.status(400).json({ error: "Email and OTP are required" });
+      }
+      
+      const token = await storage.getPasswordResetToken(email.toLowerCase().trim(), otp);
+      
+      if (!token) {
+        return res.status(400).json({ error: "Invalid or expired code" });
+      }
+      
+      // Check if expired
+      if (new Date() > token.expiresAt) {
+        return res.status(400).json({ error: "Code has expired. Please request a new one." });
+      }
+      
+      res.json({ 
+        success: true, 
+        message: "Code verified successfully. You can now reset your password." 
+      });
+    } catch (error: any) {
+      console.error('OTP verification error:', error);
+      res.status(500).json({ error: "Failed to verify code" });
+    }
+  });
+
+  // Reset password with OTP
+  app.post("/api/auth/reset-password", async (req: Request, res: Response) => {
+    try {
+      const { email, otp, newPassword } = req.body;
+      
+      if (!email || !otp || !newPassword) {
+        return res.status(400).json({ error: "Email, OTP, and new password are required" });
+      }
+      
+      if (newPassword.length < 6) {
+        return res.status(400).json({ error: "Password must be at least 6 characters" });
+      }
+      
+      const token = await storage.getPasswordResetToken(email.toLowerCase().trim(), otp);
+      
+      if (!token) {
+        return res.status(400).json({ error: "Invalid or expired code" });
+      }
+      
+      // Check if expired
+      if (new Date() > token.expiresAt) {
+        return res.status(400).json({ error: "Code has expired. Please request a new one." });
+      }
+      
+      // Hash new password
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+      
+      // Update user password
+      await storage.updateUser(token.userId, { password: hashedPassword });
+      
+      // Mark token as used
+      await storage.markPasswordResetTokenUsed(token.id);
+      
+      // Invalidate all other reset tokens for this user
+      await storage.invalidateUserPasswordResetTokens(token.userId);
+      
+      res.json({ 
+        success: true, 
+        message: "Password reset successfully. You can now log in with your new password." 
+      });
+    } catch (error: any) {
+      console.error('Password reset error:', error);
+      res.status(500).json({ error: "Failed to reset password" });
+    }
   });
 
   // ==================== Job Routes ====================
