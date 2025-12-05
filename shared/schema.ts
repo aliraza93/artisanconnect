@@ -207,3 +207,18 @@ export const adminRequests = pgTable('admin_requests', {
 export const insertAdminRequestSchema = createInsertSchema(adminRequests).omit({ id: true, createdAt: true });
 export type InsertAdminRequest = z.infer<typeof insertAdminRequestSchema>;
 export type AdminRequest = typeof adminRequests.$inferSelect;
+
+// Password Reset Tokens Table (for OTP-based password reset)
+export const passwordResetTokens = pgTable('password_reset_tokens', {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar().notNull().references(() => users.id),
+  email: text().notNull(),
+  otp: text().notNull(),
+  expiresAt: timestamp().notNull(),
+  used: boolean().notNull().default(false),
+  createdAt: timestamp().notNull().defaultNow(),
+});
+
+export const insertPasswordResetTokenSchema = createInsertSchema(passwordResetTokens).omit({ id: true, createdAt: true });
+export type InsertPasswordResetToken = z.infer<typeof insertPasswordResetTokenSchema>;
+export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
