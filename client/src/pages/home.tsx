@@ -13,6 +13,7 @@ import { SignupModal } from "@/components/auth/signup-modal";
 import heroImage from "@assets/generated_images/homeowner_shaking_hands_with_a_professional_artisan.png";
 import artisanImage from "@assets/generated_images/professional_electrician_working.png";
 import logisticsImage from "@assets/generated_images/logistics_truck_on_the_road.png";
+import happyHomeownerImage from "@assets/stock_images/happy_homeowner_rela_2867d813.jpg";
 
 export default function Home() {
   const { user } = useAuth();
@@ -46,8 +47,8 @@ export default function Home() {
               South Africa's #1 Marketplace
             </Badge>
             <h1 className="text-4xl lg:text-6xl font-heading font-extrabold text-slate-900 leading-tight">
-              Expert Artisans.<br />
-              <span className="text-primary">Trusted Results.</span>
+              Get Your Home Projects<br />
+              <span className="text-primary">Done Right.</span>
             </h1>
             <p className="text-lg lg:text-xl text-slate-600 max-w-lg leading-relaxed">
               Stop gambling with your home projects. We connect you with vetted South African artisans and logistics pros who get the job done right.
@@ -114,36 +115,60 @@ export default function Home() {
             <p className="text-slate-600 text-lg">You shouldn't have to worry about unvetted workers, hidden costs, or jobs left half-done.</p>
           </div>
           
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             <Card className="border-none shadow-lg bg-slate-50 hover:shadow-xl transition-shadow">
-              <CardContent className="p-8 space-y-4">
-                <div className="bg-red-100 w-12 h-12 rounded-full flex items-center justify-center text-red-600 mb-4">
+              <CardContent className="p-6 space-y-3">
+                <div className="bg-red-100 w-12 h-12 rounded-full flex items-center justify-center text-red-600 mb-2">
                   <X className="w-6 h-6" />
                 </div>
-                <h3 className="text-xl font-bold text-slate-900">No Accountability</h3>
-                <p className="text-slate-600">Hiring from a roadside or classifieds means zero recourse if things go wrong.</p>
+                <h3 className="text-lg font-bold text-slate-900">No Accountability</h3>
+                <p className="text-slate-600 text-sm">Hiring from a roadside or classifieds means zero recourse if things go wrong.</p>
               </CardContent>
             </Card>
-            <div className="flex items-center justify-center md:col-span-1 md:hidden lg:hidden">
-              <ArrowRight className="transform rotate-90 text-slate-300 w-8 h-8" />
-            </div>
-            <Card className="border-2 border-primary/10 shadow-xl bg-white relative overflow-hidden transform md:-translate-y-4 z-10">
+            <Card className="border-none shadow-lg bg-slate-50 hover:shadow-xl transition-shadow">
+              <CardContent className="p-6 space-y-3">
+                <div className="bg-red-100 w-12 h-12 rounded-full flex items-center justify-center text-red-600 mb-2">
+                  <X className="w-6 h-6" />
+                </div>
+                <h3 className="text-lg font-bold text-slate-900">Unpredictable Costs</h3>
+                <p className="text-slate-600 text-sm">Quotes that change halfway through the job. Hidden fees and transport costs.</p>
+              </CardContent>
+            </Card>
+            <Card className="border-none shadow-lg bg-slate-50 hover:shadow-xl transition-shadow">
+              <CardContent className="p-6 space-y-3">
+                <div className="bg-red-100 w-12 h-12 rounded-full flex items-center justify-center text-red-600 mb-2">
+                  <X className="w-6 h-6" />
+                </div>
+                <h3 className="text-lg font-bold text-slate-900">Wasted Money</h3>
+                <p className="text-slate-600 text-sm">Paying upfront with no guarantee the work will ever get done properly.</p>
+              </CardContent>
+            </Card>
+            <Card className="border-none shadow-lg bg-slate-50 hover:shadow-xl transition-shadow">
+              <CardContent className="p-6 space-y-3">
+                <div className="bg-red-100 w-12 h-12 rounded-full flex items-center justify-center text-red-600 mb-2">
+                  <X className="w-6 h-6" />
+                </div>
+                <h3 className="text-lg font-bold text-slate-900">Project Disasters</h3>
+                <p className="text-slate-600 text-sm">Jobs abandoned halfway through, leaving you with a bigger mess than before.</p>
+              </CardContent>
+            </Card>
+            <Card className="border-none shadow-lg bg-slate-50 hover:shadow-xl transition-shadow">
+              <CardContent className="p-6 space-y-3">
+                <div className="bg-red-100 w-12 h-12 rounded-full flex items-center justify-center text-red-600 mb-2">
+                  <X className="w-6 h-6" />
+                </div>
+                <h3 className="text-lg font-bold text-slate-900">Endless Stress</h3>
+                <p className="text-slate-600 text-sm">Chasing workers who don't show up and won't answer their phones.</p>
+              </CardContent>
+            </Card>
+            <Card className="border-2 border-primary/20 shadow-xl bg-white relative overflow-hidden">
               <div className="absolute top-0 inset-x-0 h-1 bg-primary"></div>
-              <CardContent className="p-8 space-y-4">
-                <div className="bg-primary/10 w-12 h-12 rounded-full flex items-center justify-center text-primary mb-4">
+              <CardContent className="p-6 space-y-3">
+                <div className="bg-primary/10 w-12 h-12 rounded-full flex items-center justify-center text-primary mb-2">
                   <CheckCircle className="w-6 h-6" />
                 </div>
-                <h3 className="text-xl font-bold text-slate-900">The ArtisanConnect Way</h3>
-                <p className="text-slate-600">Escrow payments, vetted profiles, and a dispute resolution team. Total peace of mind.</p>
-              </CardContent>
-            </Card>
-            <Card className="border-none shadow-lg bg-slate-50 hover:shadow-xl transition-shadow">
-              <CardContent className="p-8 space-y-4">
-                <div className="bg-red-100 w-12 h-12 rounded-full flex items-center justify-center text-red-600 mb-4">
-                  <X className="w-6 h-6" />
-                </div>
-                <h3 className="text-xl font-bold text-slate-900">Unpredictable Costs</h3>
-                <p className="text-slate-600">Quotes that change halfway through the job. Hidden fees and transport costs.</p>
+                <h3 className="text-lg font-bold text-slate-900">The ArtisanConnect Way</h3>
+                <p className="text-slate-600 text-sm">Escrow payments, vetted profiles, and a dispute resolution team. Total peace of mind.</p>
               </CardContent>
             </Card>
           </div>
@@ -240,6 +265,60 @@ export default function Home() {
                </div>
             </div>
          </div>
+      </section>
+
+      {/* Imagine This Instead */}
+      <section className="py-20 bg-slate-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid md:grid-cols-2 gap-12 items-center">
+            <div className="relative">
+              <div className="absolute -inset-4 bg-primary/5 rounded-[2rem] transform -rotate-2"></div>
+              <img 
+                src={happyHomeownerImage} 
+                alt="Happy homeowner in completed space" 
+                className="relative rounded-2xl shadow-xl w-full object-cover"
+              />
+            </div>
+            <div className="space-y-8">
+              <h2 className="text-3xl lg:text-4xl font-heading font-bold text-slate-900">
+                Imagine This Instead...
+              </h2>
+              <div className="space-y-5">
+                <div className="flex items-start gap-4">
+                  <div className="flex-shrink-0 bg-green-100 p-2 rounded-full text-green-600">
+                    <CheckCircle className="w-5 h-5" />
+                  </div>
+                  <p className="text-lg text-slate-700">Projects completed on time, on budget</p>
+                </div>
+                <div className="flex items-start gap-4">
+                  <div className="flex-shrink-0 bg-green-100 p-2 rounded-full text-green-600">
+                    <CheckCircle className="w-5 h-5" />
+                  </div>
+                  <p className="text-lg text-slate-700">Verified professionals you can trust</p>
+                </div>
+                <div className="flex items-start gap-4">
+                  <div className="flex-shrink-0 bg-green-100 p-2 rounded-full text-green-600">
+                    <CheckCircle className="w-5 h-5" />
+                  </div>
+                  <p className="text-lg text-slate-700">More time enjoying your home, not fixing it</p>
+                </div>
+                <div className="flex items-start gap-4">
+                  <div className="flex-shrink-0 bg-green-100 p-2 rounded-full text-green-600">
+                    <CheckCircle className="w-5 h-5" />
+                  </div>
+                  <p className="text-lg text-slate-700">Peace of mind with every hire</p>
+                </div>
+              </div>
+              <Button 
+                onClick={handlePostJob}
+                className="bg-primary hover:bg-primary/90 text-white font-bold rounded-full px-8 py-6 text-lg mt-4"
+                data-testid="button-imagine-cta"
+              >
+                Start Your Project Today
+              </Button>
+            </div>
+          </div>
+        </div>
       </section>
 
       {/* CTA */}
