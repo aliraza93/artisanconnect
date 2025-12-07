@@ -59,13 +59,14 @@ export async function registerRoutes(
       if (process.env.RESEND_API_KEY) {
         try {
           const resend = new Resend(process.env.RESEND_API_KEY);
+          console.log(`Sending welcome email to: ${user.email}`);
           const roleWelcome = user.role === 'artisan' 
             ? 'You can now browse available jobs and submit quotes to clients.'
             : user.role === 'logistics'
             ? 'You can now view logistics jobs and offer your delivery services.'
             : 'You can now post jobs and connect with trusted artisans.';
           
-          await resend.emails.send({
+          const emailResult = await resend.emails.send({
             from: 'ArtisanConnect SA <onboarding@resend.dev>',
             to: user.email,
             subject: 'Welcome to ArtisanConnect SA!',
@@ -89,10 +90,12 @@ export async function registerRoutes(
               </div>
             `,
           });
-        } catch (emailError) {
+          console.log('Welcome email sent successfully:', emailResult);
+        } catch (emailError: any) {
           console.error('Failed to send welcome email:', emailError);
-          // Don't fail signup if email fails
         }
+      } else {
+        console.warn('RESEND_API_KEY not configured - welcome email not sent');
       }
 
       // Log in the user
@@ -200,27 +203,35 @@ export async function registerRoutes(
       
       // Send email with OTP
       if (process.env.RESEND_API_KEY) {
-        const resend = new Resend(process.env.RESEND_API_KEY);
-        
-        await resend.emails.send({
-          from: 'ArtisanConnect SA <onboarding@resend.dev>',
-          to: user.email,
-          subject: 'Password Reset Code - ArtisanConnect SA',
-          html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-              <h2 style="color: #2563EB;">Password Reset Request</h2>
-              <p>Hello ${user.fullName},</p>
-              <p>You requested to reset your password for ArtisanConnect SA. Use the code below to complete the reset:</p>
-              <div style="background-color: #f3f4f6; padding: 20px; text-align: center; margin: 20px 0; border-radius: 8px;">
-                <span style="font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #2563EB;">${otp}</span>
+        try {
+          const resend = new Resend(process.env.RESEND_API_KEY);
+          console.log(`Sending password reset email to: ${user.email}`);
+          
+          const emailResult = await resend.emails.send({
+            from: 'ArtisanConnect SA <onboarding@resend.dev>',
+            to: user.email,
+            subject: 'Password Reset Code - ArtisanConnect SA',
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+                <h2 style="color: #2563EB;">Password Reset Request</h2>
+                <p>Hello ${user.fullName},</p>
+                <p>You requested to reset your password for ArtisanConnect SA. Use the code below to complete the reset:</p>
+                <div style="background-color: #f3f4f6; padding: 20px; text-align: center; margin: 20px 0; border-radius: 8px;">
+                  <span style="font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #2563EB;">${otp}</span>
+                </div>
+                <p style="color: #666;">This code expires in 15 minutes.</p>
+                <p style="color: #666;">If you didn't request this, please ignore this email.</p>
+                <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+                <p style="color: #999; font-size: 12px;">ArtisanConnect SA - Connecting Homeowners with Trusted Artisans</p>
               </div>
-              <p style="color: #666;">This code expires in 15 minutes.</p>
-              <p style="color: #666;">If you didn't request this, please ignore this email.</p>
-              <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
-              <p style="color: #999; font-size: 12px;">ArtisanConnect SA - Connecting Homeowners with Trusted Artisans</p>
-            </div>
-          `,
-        });
+            `,
+          });
+          console.log('Password reset email sent successfully:', emailResult);
+        } catch (emailError: any) {
+          console.error('Failed to send password reset email:', emailError);
+        }
+      } else {
+        console.warn('RESEND_API_KEY not configured - password reset email not sent');
       }
       
       res.json({ 
