@@ -4,9 +4,16 @@
 ArtisanConnect SA is a production-ready Progressive Web App (PWA) marketplace connecting South African homeowners with vetted artisans (plumbers, electricians) and logistics providers. The platform uses Donald Miller's StoryBrand framework for messaging, emphasizing trust, competence, and ease of use.
 
 **Platform Model:** 20% commission on all transactions with escrow payment system  
-**Last Updated:** December 5, 2025
+**Last Updated:** December 8, 2025
 
 ## Recent Changes
+
+### December 8, 2025 - Artisan Ratings/Reviews Visibility & UX Improvements
+- ✅ **Artisan ratings in quotes** - Clients can now see artisan name, rating, review count, years of experience, and verification status when viewing quotes
+- ✅ **Job details modal** - New dialog for clients to view full job details and compare quotes with artisan information
+- ✅ **Enhanced Quote API** - Backend returns artisan details with quotes for clients (getQuotesByJobWithArtisan)
+- ✅ **Improved textarea UX** - Added scrollIntoView on focus for mobile keyboard, resize disabled
+- ✅ **Better error logging** - Added detailed logging for job creation and quote fetching
 
 ### December 5, 2025 - Hourly Billing, Password Reset & Platform Enhancements
 - ✅ **Password reset with OTP** - Users can reset passwords via email OTP (Resend integration)

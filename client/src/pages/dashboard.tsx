@@ -789,12 +789,34 @@ export default function Dashboard() {
                               <div className="flex items-center gap-3">
                                 <Avatar>
                                   <AvatarFallback className="bg-primary/10 text-primary">
-                                    {quote.artisanId.substring(0, 2).toUpperCase()}
+                                    {(quote.artisanName || 'AR').substring(0, 2).toUpperCase()}
                                   </AvatarFallback>
                                 </Avatar>
                                 <div>
-                                  <div className="font-bold text-sm">Artisan</div>
-                                  <div className="text-xs text-slate-500">{quote.jobTitle}</div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-bold text-sm">{quote.artisanName || 'Artisan'}</span>
+                                    {quote.artisanVerified && (
+                                      <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-[10px] px-1 py-0">
+                                        <CheckCircle className="w-2.5 h-2.5 mr-0.5" /> Verified
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-2 text-xs text-slate-500">
+                                    <div className="flex items-center gap-0.5">
+                                      <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />
+                                      <span>{quote.artisanRating ? parseFloat(quote.artisanRating).toFixed(1) : 'New'}</span>
+                                      {quote.artisanReviewCount !== undefined && quote.artisanReviewCount > 0 && (
+                                        <span>({quote.artisanReviewCount})</span>
+                                      )}
+                                    </div>
+                                    {quote.artisanYearsExperience && (
+                                      <>
+                                        <span>•</span>
+                                        <span>{quote.artisanYearsExperience} yrs exp</span>
+                                      </>
+                                    )}
+                                  </div>
+                                  <div className="text-xs text-slate-400 mt-0.5">{quote.jobTitle}</div>
                                 </div>
                               </div>
                               <div className="text-right">
@@ -1026,6 +1048,181 @@ export default function Dashboard() {
           </Tabs>
         </div>
       </div>
+
+      {/* Job Details Modal (for viewing quotes with artisan info) */}
+      <Dialog open={!!selectedJobForQuotes} onOpenChange={(open) => !open && setSelectedJobForQuotes(null)}>
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+          {selectedJobForQuotes && (() => {
+            const job = jobs.find(j => j.id === selectedJobForQuotes);
+            const jobQuotes = quotes[selectedJobForQuotes] || [];
+            if (!job) return null;
+            
+            return (
+              <>
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <Briefcase className="w-5 h-5" />
+                    {job.title}
+                  </DialogTitle>
+                  <DialogDescription>
+                    View job details and artisan quotes
+                  </DialogDescription>
+                </DialogHeader>
+                
+                <div className="space-y-6 py-4">
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-slate-500">Category:</span>
+                      <Badge variant="outline" className="ml-2 bg-blue-50 text-blue-700 border-blue-100">
+                        {job.category}
+                      </Badge>
+                    </div>
+                    <div>
+                      <span className="text-slate-500">Status:</span>
+                      <span className="ml-2">{getStatusBadge(job.status)}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <MapPin className="w-4 h-4 text-slate-400" />
+                      <span>{job.location}</span>
+                    </div>
+                    {job.budget && (
+                      <div>
+                        <span className="text-slate-500">Budget:</span>
+                        <span className="ml-2 font-medium">R {job.budget}</span>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div>
+                    <h4 className="font-medium mb-2">Description</h4>
+                    <p className="text-sm text-slate-600">{job.description}</p>
+                  </div>
+                  
+                  <div className="border-t pt-4">
+                    <h4 className="font-medium mb-4 flex items-center gap-2">
+                      Quotes ({jobQuotes.length})
+                      {jobQuotes.filter(q => q.status === 'pending').length > 0 && (
+                        <Badge className="bg-red-100 text-red-600 border-none">
+                          {jobQuotes.filter(q => q.status === 'pending').length} pending
+                        </Badge>
+                      )}
+                    </h4>
+                    
+                    {jobQuotes.length === 0 ? (
+                      <div className="text-center py-8 text-slate-500">
+                        <p>No quotes yet for this job.</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {jobQuotes.map((quote) => (
+                          <div key={quote.id} className="p-4 border rounded-xl space-y-3" data-testid={`modal-quote-card-${quote.id}`}>
+                            <div className="flex items-start justify-between">
+                              <div className="flex items-center gap-3">
+                                <Avatar className="h-12 w-12">
+                                  <AvatarFallback className="bg-primary/10 text-primary text-lg">
+                                    {(quote.artisanName || 'AR').substring(0, 2).toUpperCase()}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-bold">{quote.artisanName || 'Artisan'}</span>
+                                    {quote.artisanVerified && (
+                                      <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-xs px-1.5">
+                                        <CheckCircle className="w-3 h-3 mr-0.5" /> Verified
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-3 text-sm text-slate-500 mt-1">
+                                    <div className="flex items-center gap-1">
+                                      <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+                                      <span className="font-medium">
+                                        {quote.artisanRating ? parseFloat(quote.artisanRating).toFixed(1) : 'New'}
+                                      </span>
+                                      {quote.artisanReviewCount !== undefined && quote.artisanReviewCount > 0 && (
+                                        <span className="text-slate-400">({quote.artisanReviewCount} reviews)</span>
+                                      )}
+                                    </div>
+                                    {quote.artisanYearsExperience && (
+                                      <>
+                                        <span className="text-slate-300">|</span>
+                                        <span>{quote.artisanYearsExperience} years experience</span>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <div className="text-xl font-bold text-slate-900">
+                                  {formatCurrency(quote.amount)}
+                                </div>
+                                {quote.billingType === 'hourly' && (
+                                  <div className="text-sm text-purple-600">
+                                    {formatCurrency(quote.hourlyRate || '0')}/hr × {quote.estimatedHours} hrs
+                                  </div>
+                                )}
+                                <Badge 
+                                  variant="outline" 
+                                  className={`mt-1 ${
+                                    quote.billingType === 'hourly' 
+                                      ? 'bg-purple-50 text-purple-700 border-purple-200' 
+                                      : 'bg-slate-50 text-slate-700 border-slate-200'
+                                  }`}
+                                >
+                                  {quote.billingType === 'hourly' ? (
+                                    <><Clock className="w-3 h-3 mr-1" /> Hourly</>
+                                  ) : (
+                                    <><DollarSign className="w-3 h-3 mr-1" /> Fixed</>
+                                  )}
+                                </Badge>
+                              </div>
+                            </div>
+                            
+                            {quote.message && (
+                              <div className="bg-slate-50 p-3 rounded-lg text-sm text-slate-600">
+                                "{quote.message}"
+                              </div>
+                            )}
+
+                            {user?.role === 'client' && quote.status === 'pending' && (
+                              <div className="flex gap-2 pt-2">
+                                <Button 
+                                  className="flex-1 bg-primary"
+                                  onClick={() => {
+                                    handleAcceptQuote(quote.id);
+                                    setSelectedJobForQuotes(null);
+                                  }}
+                                  data-testid={`modal-button-accept-quote-${quote.id}`}
+                                >
+                                  Accept Quote
+                                </Button>
+                                <Button variant="outline" className="flex-1">
+                                  Decline
+                                </Button>
+                              </div>
+                            )}
+                            
+                            {quote.status === 'accepted' && (
+                              <Badge className="bg-green-100 text-green-700">
+                                <CheckCircle className="w-3 h-3 mr-1" /> Accepted
+                              </Badge>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setSelectedJobForQuotes(null)}>
+                    Close
+                  </Button>
+                </DialogFooter>
+              </>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
 
       {/* Quote Submission Modal */}
       <Dialog open={showQuoteModal} onOpenChange={setShowQuoteModal}>

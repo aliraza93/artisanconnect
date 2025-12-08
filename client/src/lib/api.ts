@@ -53,6 +53,11 @@ export interface Quote {
   hourlyRate: string | null;
   estimatedHours: string | null;
   createdAt: string;
+  artisanName?: string;
+  artisanRating?: string | null;
+  artisanReviewCount?: number;
+  artisanYearsExperience?: number | null;
+  artisanVerified?: boolean;
 }
 
 export interface Payment {

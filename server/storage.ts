@@ -39,6 +39,14 @@ import {
 import { db } from "./db";
 import { eq, and, or, desc } from "drizzle-orm";
 
+export interface QuoteWithArtisan extends Quote {
+  artisanName: string;
+  artisanRating: string | null;
+  artisanReviewCount: number;
+  artisanYearsExperience: number | null;
+  artisanVerified: boolean;
+}
+
 export interface IStorage {
   // Users
   getUser(id: string): Promise<User | undefined>;
@@ -62,6 +70,7 @@ export interface IStorage {
   createQuote(quote: InsertQuote): Promise<Quote>;
   getQuote(id: string): Promise<Quote | undefined>;
   getQuotesByJob(jobId: string): Promise<Quote[]>;
+  getQuotesByJobWithArtisan(jobId: string): Promise<QuoteWithArtisan[]>;
   getQuotesByArtisan(artisanId: string): Promise<Quote[]>;
   updateQuote(id: string, updates: Partial<Quote>): Promise<Quote | undefined>;
 
@@ -185,6 +194,28 @@ export class DatabaseStorage implements IStorage {
 
   async getQuotesByJob(jobId: string): Promise<Quote[]> {
     return db.select().from(quotes).where(eq(quotes.jobId, jobId)).orderBy(desc(quotes.createdAt));
+  }
+
+  async getQuotesByJobWithArtisan(jobId: string): Promise<QuoteWithArtisan[]> {
+    const jobQuotes = await db.select().from(quotes).where(eq(quotes.jobId, jobId)).orderBy(desc(quotes.createdAt));
+    
+    const quotesWithArtisan: QuoteWithArtisan[] = [];
+    for (const quote of jobQuotes) {
+      const [artisan] = await db.select().from(users).where(eq(users.id, quote.artisanId));
+      const [profile] = await db.select().from(artisanProfiles).where(eq(artisanProfiles.userId, quote.artisanId));
+      const artisanReviews = await db.select().from(reviews).where(eq(reviews.revieweeId, quote.artisanId));
+      
+      quotesWithArtisan.push({
+        ...quote,
+        artisanName: artisan?.fullName || 'Unknown Artisan',
+        artisanRating: artisan?.rating,
+        artisanReviewCount: artisanReviews.length,
+        artisanYearsExperience: profile?.yearsExperience ?? null,
+        artisanVerified: profile?.verified ?? false,
+      });
+    }
+    
+    return quotesWithArtisan;
   }
 
   async getQuotesByArtisan(artisanId: string): Promise<Quote[]> {

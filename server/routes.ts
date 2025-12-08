@@ -326,14 +326,17 @@ export async function registerRoutes(
   app.post("/api/jobs", requireClient, async (req: Request, res: Response) => {
     try {
       const user = req.user as User;
+      console.log('Creating job for user:', user.id, 'with data:', req.body);
       const validatedData = insertJobSchema.parse({
         ...req.body,
         clientId: user.id,
       });
       
       const job = await storage.createJob(validatedData);
+      console.log('Job created successfully:', job.id);
       res.status(201).json(job);
     } catch (error: any) {
+      console.error('Job creation error:', error);
       res.status(400).json({ error: error.message || "Failed to create job" });
     }
   });
@@ -446,12 +449,19 @@ export async function registerRoutes(
     }
   });
 
-  // Get quotes for a job
+  // Get quotes for a job (with artisan details for clients)
   app.get("/api/jobs/:jobId/quotes", isAuthenticated, async (req: Request, res: Response) => {
     try {
-      const quotes = await storage.getQuotesByJob(req.params.jobId);
-      res.json(quotes);
+      const user = req.user as User;
+      if (user.role === 'client' || user.role === 'admin') {
+        const quotesWithArtisan = await storage.getQuotesByJobWithArtisan(req.params.jobId);
+        res.json(quotesWithArtisan);
+      } else {
+        const quotes = await storage.getQuotesByJob(req.params.jobId);
+        res.json(quotes);
+      }
     } catch (error: any) {
+      console.error('Failed to fetch quotes:', error);
       res.status(500).json({ error: "Failed to fetch quotes" });
     }
   });
