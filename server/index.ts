@@ -158,7 +158,10 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  await initStripe();
+  // Initialize Stripe (will fail gracefully in local development)
+  await initStripe().catch(() => {
+    // Stripe initialization failed (expected in local dev), continue without it
+  });
   setupWebSocket(httpServer);
   await registerRoutes(httpServer, app);
 
@@ -185,14 +188,25 @@ app.use((req, res, next) => {
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || "5000", 10);
+  // Use localhost for local development, 0.0.0.0 for production (Replit)
+  const host = process.env.NODE_ENV === "production" ? "0.0.0.0" : "127.0.0.1";
+  
+  httpServer.on('error', (err: any) => {
+    if (err.code === 'EACCES') {
+      log(`Port ${port} requires elevated permissions or is already in use. Try setting PORT in .env to a different port (e.g., PORT=3000).`);
+    } else if (err.code === 'EADDRINUSE') {
+      log(`Port ${port} is already in use. Try setting PORT in .env to a different port (e.g., PORT=3000).`);
+    } else {
+      log(`Server error: ${err.message}`);
+    }
+    process.exit(1);
+  });
+  
   httpServer.listen(
-    {
-      port,
-      host: "0.0.0.0",
-      reusePort: true,
-    },
+    port,
+    host,
     () => {
-      log(`serving on port ${port}`);
+      log(`serving on http://${host}:${port}`);
     },
   );
 })();
