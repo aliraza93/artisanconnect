@@ -11,7 +11,7 @@ async function getCredentials() {
       : null;
 
   if (!xReplitToken) {
-    throw new Error('X_REPLIT_TOKEN not found for repl/depl - Stripe features disabled in local development');
+    throw new Error('X_REPLIT_TOKEN not found for repl/depl');
   }
 
   const connectorName = 'stripe';
