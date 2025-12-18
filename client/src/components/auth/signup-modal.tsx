@@ -9,6 +9,9 @@ import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
+import { api } from "@/lib/api";
+import { Mail, CheckCircle2 } from "lucide-react";
 
 interface SignupModalProps {
   open: boolean;
@@ -16,7 +19,10 @@ interface SignupModalProps {
   onSwitchToLogin?: () => void;
 }
 
+type SignupView = 'form' | 'verification';
+
 export function SignupModal({ open, onOpenChange, onSwitchToLogin }: SignupModalProps) {
+  const [view, setView] = useState<SignupView>('form');
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -34,7 +40,9 @@ export function SignupModal({ open, onOpenChange, onSwitchToLogin }: SignupModal
   });
   
   const [loading, setLoading] = useState(false);
-  const { signup } = useAuth();
+  const [verificationOtp, setVerificationOtp] = useState("");
+  const [verifying, setVerifying] = useState(false);
+  const { signup, refreshUser } = useAuth();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
@@ -58,10 +66,10 @@ export function SignupModal({ open, onOpenChange, onSwitchToLogin }: SignupModal
       const user = await signup(signupData);
       toast({
         title: "Account created!",
-        description: `Welcome to ArtisanConnect, ${user.fullName}`,
+        description: "Please verify your email address to continue.",
       });
-      onOpenChange(false);
-      setLocation('/dashboard');
+      // Switch to verification view
+      setView('verification');
     } catch (error: any) {
       toast({
         title: "Signup failed",
@@ -73,16 +81,59 @@ export function SignupModal({ open, onOpenChange, onSwitchToLogin }: SignupModal
     }
   };
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto" data-testid="signup-modal">
-        <DialogHeader>
-          <DialogTitle>Create Your Account</DialogTitle>
-          <DialogDescription>
-            Join ArtisanConnect to find reliable service providers or grow your business
-          </DialogDescription>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+  const handleVerifyEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setVerifying(true);
+
+    try {
+      const result = await api.verifyEmail(formData.email, verificationOtp);
+      await refreshUser();
+      toast({
+        title: "Email verified!",
+        description: "Your email has been successfully verified.",
+      });
+      onOpenChange(false);
+      setLocation('/dashboard');
+    } catch (error: any) {
+      toast({
+        title: "Verification failed",
+        description: error.message || "Invalid or expired code",
+        variant: "destructive",
+      });
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  const handleResendCode = async () => {
+    setLoading(true);
+    try {
+      await api.sendVerificationEmail(formData.email);
+      toast({
+        title: "Code sent",
+        description: "A new verification code has been sent to your email.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to resend code",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleClose = (isOpen: boolean) => {
+    if (!isOpen) {
+      setView('form');
+      setVerificationOtp("");
+    }
+    onOpenChange(isOpen);
+  };
+
+  const renderSignupForm = () => (
+    <form onSubmit={handleSubmit} className="space-y-4 mt-4">
           <div className="space-y-2">
             <Label htmlFor="fullName">Full Name</Label>
             <Input
@@ -248,6 +299,78 @@ export function SignupModal({ open, onOpenChange, onSwitchToLogin }: SignupModal
             </div>
           )}
         </form>
+  );
+
+  const renderVerificationView = () => (
+    <div className="space-y-4 mt-4">
+      <div className="text-center py-4">
+        <div className="mx-auto w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-4">
+          <Mail className="h-6 w-6 text-primary" />
+        </div>
+        <h3 className="font-semibold">Verify Your Email</h3>
+        <p className="text-sm text-muted-foreground mt-1">
+          We sent a 6-digit verification code to <span className="font-medium">{formData.email}</span>
+        </p>
+      </div>
+      
+      <form onSubmit={handleVerifyEmail} className="space-y-4">
+        <div className="flex justify-center">
+          <InputOTP
+            maxLength={6}
+            value={verificationOtp}
+            onChange={(value) => setVerificationOtp(value)}
+            data-testid="input-verification-otp"
+          >
+            <InputOTPGroup>
+              <InputOTPSlot index={0} />
+              <InputOTPSlot index={1} />
+              <InputOTPSlot index={2} />
+              <InputOTPSlot index={3} />
+              <InputOTPSlot index={4} />
+              <InputOTPSlot index={5} />
+            </InputOTPGroup>
+          </InputOTP>
+        </div>
+        <Button 
+          type="submit" 
+          className="w-full" 
+          disabled={verifying || verificationOtp.length !== 6}
+          data-testid="button-verify-email"
+        >
+          {verifying ? "Verifying..." : "Verify Email"}
+        </Button>
+        <div className="text-center text-sm text-muted-foreground">
+          Didn't receive the code?{" "}
+          <Button
+            type="button"
+            variant="link"
+            className="p-0 h-auto"
+            onClick={handleResendCode}
+            disabled={loading}
+            data-testid="button-resend-verification"
+          >
+            Resend
+          </Button>
+        </div>
+      </form>
+    </div>
+  );
+
+  return (
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto" data-testid="signup-modal">
+        <DialogHeader>
+          <DialogTitle>
+            {view === 'verification' ? 'Verify Your Email' : 'Create Your Account'}
+          </DialogTitle>
+          <DialogDescription>
+            {view === 'verification' 
+              ? 'Enter the verification code sent to your email'
+              : 'Join ArtisanConnect to find reliable service providers or grow your business'}
+          </DialogDescription>
+        </DialogHeader>
+        {view === 'form' && renderSignupForm()}
+        {view === 'verification' && renderVerificationView()}
       </DialogContent>
     </Dialog>
   );

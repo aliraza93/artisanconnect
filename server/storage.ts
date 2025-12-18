@@ -11,6 +11,7 @@ import {
   withdrawals,
   adminRequests,
   passwordResetTokens,
+  emailVerificationTokens,
   type User,
   type InsertUser,
   type Job,
@@ -35,6 +36,8 @@ import {
   type InsertAdminRequest,
   type PasswordResetToken,
   type InsertPasswordResetToken,
+  type EmailVerificationToken,
+  type InsertEmailVerificationToken,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, or, desc } from "drizzle-orm";
@@ -118,6 +121,12 @@ export interface IStorage {
   getPasswordResetToken(email: string, otp: string): Promise<PasswordResetToken | undefined>;
   markPasswordResetTokenUsed(id: string): Promise<void>;
   invalidateUserPasswordResetTokens(userId: string): Promise<void>;
+
+  // Email Verification Tokens
+  createEmailVerificationToken(token: InsertEmailVerificationToken): Promise<EmailVerificationToken>;
+  getEmailVerificationToken(email: string, otp: string): Promise<EmailVerificationToken | undefined>;
+  markEmailVerificationTokenUsed(id: string): Promise<void>;
+  invalidateUserEmailVerificationTokens(userId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -399,6 +408,34 @@ export class DatabaseStorage implements IStorage {
     await db.update(passwordResetTokens)
       .set({ used: true })
       .where(eq(passwordResetTokens.userId, userId));
+  }
+
+  // Email Verification Tokens
+  async createEmailVerificationToken(token: InsertEmailVerificationToken): Promise<EmailVerificationToken> {
+    const [created] = await db.insert(emailVerificationTokens).values(token).returning();
+    return created;
+  }
+
+  async getEmailVerificationToken(email: string, otp: string): Promise<EmailVerificationToken | undefined> {
+    const [token] = await db.select().from(emailVerificationTokens)
+      .where(and(
+        eq(emailVerificationTokens.email, email),
+        eq(emailVerificationTokens.otp, otp),
+        eq(emailVerificationTokens.used, false)
+      ));
+    return token || undefined;
+  }
+
+  async markEmailVerificationTokenUsed(id: string): Promise<void> {
+    await db.update(emailVerificationTokens)
+      .set({ used: true })
+      .where(eq(emailVerificationTokens.id, id));
+  }
+
+  async invalidateUserEmailVerificationTokens(userId: string): Promise<void> {
+    await db.update(emailVerificationTokens)
+      .set({ used: true })
+      .where(eq(emailVerificationTokens.userId, userId));
   }
 }
 

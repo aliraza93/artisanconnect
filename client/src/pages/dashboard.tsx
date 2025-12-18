@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { MapPin, Star, AlertCircle, Plus, Briefcase, Clock, CheckCircle, DollarSign, CreditCard, Building } from "lucide-react";
+import { MapPin, Star, AlertCircle, Plus, Briefcase, Clock, CheckCircle, DollarSign, CreditCard, Building, Mail, X } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ChatInterface } from "@/components/chat/chat-interface";
 import { useAuth } from "@/lib/auth-context";
@@ -18,9 +18,11 @@ import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 
 export default function Dashboard() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, refreshUser } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   
@@ -62,13 +64,19 @@ export default function Dashboard() {
     accountType: 'savings',
   });
 
+  // Email verification state
+  const [showVerificationModal, setShowVerificationModal] = useState(false);
+  const [verificationOtp, setVerificationOtp] = useState("");
+  const [verifying, setVerifying] = useState(false);
+  const [resendingCode, setResendingCode] = useState(false);
+
   useEffect(() => {
     if (!authLoading && !user) {
       setLocation('/');
       return;
     }
 
-    if (user) {
+    if (user && user.verified) {
       fetchData();
     }
   }, [user, authLoading]);
@@ -449,6 +457,121 @@ export default function Dashboard() {
     return null;
   }
 
+  // Show verification screen if user is not verified
+  if (!user.verified) {
+    return (
+      <Layout>
+        <div className="bg-slate-50 min-h-[calc(100vh-64px)]">
+          <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+            <Card className="p-8">
+              <div className="text-center mb-8">
+                <div className="mx-auto w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mb-4">
+                  <Mail className="h-8 w-8 text-amber-600" />
+                </div>
+                <h1 className="text-3xl font-bold text-slate-900 mb-2">
+                  Verify Your Email Address
+                </h1>
+                <p className="text-slate-600">
+                  Please verify your email address to access your dashboard and all features.
+                </p>
+              </div>
+
+              <Alert className="mb-6 border-amber-200 bg-amber-50">
+                <Mail className="h-4 w-4 text-amber-600" />
+                <AlertTitle className="text-amber-900">Verification Required</AlertTitle>
+                <AlertDescription className="text-amber-800">
+                  A verification code has been sent to <strong>{user.email}</strong>. 
+                  Please check your email and enter the code below to verify your account.
+                </AlertDescription>
+              </Alert>
+
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                setVerifying(true);
+                try {
+                  const result = await api.verifyEmail(user.email, verificationOtp);
+                  await refreshUser();
+                  toast({
+                    title: "Email verified!",
+                    description: "Your email has been successfully verified. You can now access all features.",
+                  });
+                  setVerificationOtp("");
+                } catch (error: any) {
+                  toast({
+                    title: "Verification failed",
+                    description: error.message || "Invalid or expired code",
+                    variant: "destructive",
+                  });
+                } finally {
+                  setVerifying(false);
+                }
+              }} className="space-y-6">
+                <div className="space-y-2">
+                  <Label>Enter Verification Code</Label>
+                  <div className="flex justify-center">
+                    <InputOTP
+                      maxLength={6}
+                      value={verificationOtp}
+                      onChange={(value) => setVerificationOtp(value)}
+                      data-testid="input-verification-otp-fullscreen"
+                    >
+                      <InputOTPGroup>
+                        <InputOTPSlot index={0} />
+                        <InputOTPSlot index={1} />
+                        <InputOTPSlot index={2} />
+                        <InputOTPSlot index={3} />
+                        <InputOTPSlot index={4} />
+                        <InputOTPSlot index={5} />
+                      </InputOTPGroup>
+                    </InputOTP>
+                  </div>
+                </div>
+                <Button 
+                  type="submit" 
+                  className="w-full" 
+                  disabled={verifying || verificationOtp.length !== 6}
+                  data-testid="button-verify-email-fullscreen"
+                >
+                  {verifying ? "Verifying..." : "Verify Email"}
+                </Button>
+                <div className="text-center text-sm text-muted-foreground">
+                  Didn't receive the code?{" "}
+                  <Button
+                    type="button"
+                    variant="link"
+                    className="p-0 h-auto"
+                    onClick={async () => {
+                      setResendingCode(true);
+                      try {
+                        await api.sendVerificationEmail(user.email);
+                        toast({
+                          title: "Code sent",
+                          description: "A new verification code has been sent to your email.",
+                        });
+                      } catch (error: any) {
+                        toast({
+                          title: "Error",
+                          description: error.message || "Failed to resend code",
+                          variant: "destructive",
+                        });
+                      } finally {
+                        setResendingCode(false);
+                      }
+                    }}
+                    disabled={resendingCode}
+                    data-testid="button-resend-verification-fullscreen"
+                  >
+                    {resendingCode ? "Sending..." : "Resend Code"}
+                  </Button>
+                </div>
+              </form>
+            </Card>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
   return (
     <Layout>
       <div className="bg-slate-50 min-h-[calc(100vh-64px)]">
@@ -475,6 +598,52 @@ export default function Dashboard() {
               </Button>
             )}
           </div>
+
+          {/* Email Verification Banner - Should not show since we check above, but keeping for safety */}
+          {!user.verified && (
+            <Alert className="mb-6 border-amber-200 bg-amber-50" data-testid="alert-email-verification">
+              <Mail className="h-4 w-4 text-amber-600" />
+              <AlertTitle className="text-amber-900">Verify Your Email Address</AlertTitle>
+              <AlertDescription className="text-amber-800">
+                Please verify your email address to access all features. 
+                <Button
+                  variant="link"
+                  className="p-0 h-auto ml-2 text-amber-900 underline"
+                  onClick={() => setShowVerificationModal(true)}
+                  data-testid="button-verify-email-banner"
+                >
+                  Verify now
+                </Button>
+                or
+                <Button
+                  variant="link"
+                  className="p-0 h-auto ml-2 text-amber-900 underline"
+                  onClick={async () => {
+                    setResendingCode(true);
+                    try {
+                      await api.sendVerificationEmail(user.email);
+                      toast({
+                        title: "Code sent",
+                        description: "A new verification code has been sent to your email.",
+                      });
+                    } catch (error: any) {
+                      toast({
+                        title: "Error",
+                        description: error.message || "Failed to resend code",
+                        variant: "destructive",
+                      });
+                    } finally {
+                      setResendingCode(false);
+                    }
+                  }}
+                  disabled={resendingCode}
+                  data-testid="button-resend-verification-banner"
+                >
+                  {resendingCode ? "Sending..." : "resend code"}
+                </Button>
+              </AlertDescription>
+            </Alert>
+          )}
 
           <Tabs defaultValue="overview">
             <TabsList className="mb-6">
@@ -1464,6 +1633,98 @@ export default function Dashboard() {
               </Button>
             )}
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Email Verification Modal */}
+      <Dialog open={showVerificationModal} onOpenChange={setShowVerificationModal}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Verify Your Email</DialogTitle>
+            <DialogDescription>
+              Enter the 6-digit verification code sent to {user?.email}
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={async (e) => {
+            e.preventDefault();
+            if (!user) return;
+            setVerifying(true);
+            try {
+              const result = await api.verifyEmail(user.email, verificationOtp);
+              await refreshUser();
+              toast({
+                title: "Email verified!",
+                description: "Your email has been successfully verified.",
+              });
+              setShowVerificationModal(false);
+              setVerificationOtp("");
+            } catch (error: any) {
+              toast({
+                title: "Verification failed",
+                description: error.message || "Invalid or expired code",
+                variant: "destructive",
+              });
+            } finally {
+              setVerifying(false);
+            }
+          }} className="space-y-4 mt-4">
+            <div className="flex justify-center">
+              <InputOTP
+                maxLength={6}
+                value={verificationOtp}
+                onChange={(value) => setVerificationOtp(value)}
+                data-testid="input-verification-otp-modal"
+              >
+                <InputOTPGroup>
+                  <InputOTPSlot index={0} />
+                  <InputOTPSlot index={1} />
+                  <InputOTPSlot index={2} />
+                  <InputOTPSlot index={3} />
+                  <InputOTPSlot index={4} />
+                  <InputOTPSlot index={5} />
+                </InputOTPGroup>
+              </InputOTP>
+            </div>
+            <Button 
+              type="submit" 
+              className="w-full" 
+              disabled={verifying || verificationOtp.length !== 6}
+              data-testid="button-verify-email-modal"
+            >
+              {verifying ? "Verifying..." : "Verify Email"}
+            </Button>
+            <div className="text-center text-sm text-muted-foreground">
+              Didn't receive the code?{" "}
+              <Button
+                type="button"
+                variant="link"
+                className="p-0 h-auto"
+                onClick={async () => {
+                  if (!user) return;
+                  setResendingCode(true);
+                  try {
+                    await api.sendVerificationEmail(user.email);
+                    toast({
+                      title: "Code sent",
+                      description: "A new verification code has been sent to your email.",
+                    });
+                  } catch (error: any) {
+                    toast({
+                      title: "Error",
+                      description: error.message || "Failed to resend code",
+                      variant: "destructive",
+                    });
+                  } finally {
+                    setResendingCode(false);
+                  }
+                }}
+                disabled={resendingCode}
+                data-testid="button-resend-verification-modal"
+              >
+                {resendingCode ? "Sending..." : "Resends"}
+              </Button>
+            </div>
+          </form>
         </DialogContent>
       </Dialog>
     </Layout>

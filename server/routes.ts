@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import passport from "./auth";
 import bcrypt from "bcryptjs";
-import { isAuthenticated, requireClient, requireArtisan, requireAdmin } from "./middleware";
+import { isAuthenticated, requireClient, requireArtisan, requireAdmin, requireVerified } from "./middleware";
 import type { User } from "@shared/schema";
 import {
   insertUserSchema,
@@ -55,11 +55,24 @@ export async function registerRoutes(
         });
       }
 
-      // Send welcome email
+      // Generate email verification OTP
+      const otp = generateOTP();
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+      
+      // Create verification token
+      await storage.createEmailVerificationToken({
+        userId: user.id,
+        email: user.email,
+        otp,
+        expiresAt,
+        used: false,
+      });
+
+      // Send verification email
       if (process.env.RESEND_API_KEY) {
         try {
           const resend = new Resend(process.env.RESEND_API_KEY);
-          console.log(`Sending welcome email to: ${user.email}`);
+          console.log(`Sending verification email to: ${user.email}`);
           const roleWelcome = user.role === 'artisan' 
             ? 'You can now browse available jobs and submit quotes to clients.'
             : user.role === 'logistics'
@@ -69,16 +82,22 @@ export async function registerRoutes(
           const emailResult = await resend.emails.send({
             from: 'ArtisanConnect SA <onboarding@resend.dev>',
             to: user.email,
-            subject: 'Welcome to ArtisanConnect SA!',
+            subject: 'Welcome to ArtisanConnect SA - Verify Your Email',
             html: `
               <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
                 <h2 style="color: #2563EB;">Welcome to ArtisanConnect SA!</h2>
                 <p>Hello ${user.fullName},</p>
                 <p>Thank you for joining ArtisanConnect SA - South Africa's trusted marketplace connecting homeowners with skilled artisans.</p>
                 <p><strong>${roleWelcome}</strong></p>
+                <p>To get started, please verify your email address by entering the code below:</p>
+                <div style="background-color: #f3f4f6; padding: 20px; text-align: center; margin: 20px 0; border-radius: 8px;">
+                  <span style="font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #2563EB;">${otp}</span>
+                </div>
+                <p style="color: #666;">This code expires in 24 hours.</p>
                 <div style="background-color: #f3f4f6; padding: 20px; margin: 20px 0; border-radius: 8px;">
                   <h3 style="color: #2563EB; margin-top: 0;">What's Next?</h3>
                   <ul style="color: #374151;">
+                    <li>Verify your email address using the code above</li>
                     <li>Complete your profile to build trust</li>
                     <li>Explore the platform features</li>
                     <li>Start connecting with ${user.role === 'client' ? 'artisans' : 'clients'}</li>
@@ -90,12 +109,14 @@ export async function registerRoutes(
               </div>
             `,
           });
-          console.log('Welcome email sent successfully:', emailResult);
+          console.log('Verification email sent successfully:', emailResult);
         } catch (emailError: any) {
-          console.error('Failed to send welcome email:', emailError);
+          console.error('Failed to send verification email:', emailError);
+          console.error('Email error details:', JSON.stringify(emailError, null, 2));
         }
       } else {
-        console.warn('RESEND_API_KEY not configured - welcome email not sent');
+        console.error('RESEND_API_KEY not configured - verification email not sent');
+        console.error('To enable email sending, set RESEND_API_KEY in your environment variables');
       }
 
       // Log in the user
@@ -320,10 +341,153 @@ export async function registerRoutes(
     }
   });
 
+  // ==================== Email Verification Routes ====================
+  
+  // Send email verification OTP
+  app.post("/api/auth/send-verification", async (req: Request, res: Response) => {
+    try {
+      const { email } = req.body;
+      
+      if (!email) {
+        return res.status(400).json({ error: "Email is required" });
+      }
+      
+      // Find user by email
+      const user = await storage.getUserByEmail(email.toLowerCase().trim());
+      
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      // Check if already verified
+      if (user.verified) {
+        return res.json({ 
+          success: true, 
+          message: "Email is already verified" 
+        });
+      }
+      
+      // Invalidate any existing tokens for this user
+      await storage.invalidateUserEmailVerificationTokens(user.id);
+      
+      // Generate OTP and expiry (24 hours for email verification)
+      const otp = generateOTP();
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      
+      // Save token
+      await storage.createEmailVerificationToken({
+        userId: user.id,
+        email: user.email,
+        otp,
+        expiresAt,
+        used: false,
+      });
+      
+      // Send email with OTP
+      if (process.env.RESEND_API_KEY) {
+        try {
+          const resend = new Resend(process.env.RESEND_API_KEY);
+          console.log(`Sending email verification to: ${user.email}`);
+          
+          const emailResult = await resend.emails.send({
+            from: 'ArtisanConnect SA <onboarding@resend.dev>',
+            to: user.email,
+            subject: 'Verify Your Email - ArtisanConnect SA',
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+                <h2 style="color: #2563EB;">Verify Your Email Address</h2>
+                <p>Hello ${user.fullName},</p>
+                <p>Thank you for signing up for ArtisanConnect SA! Please verify your email address by entering the code below:</p>
+                <div style="background-color: #f3f4f6; padding: 20px; text-align: center; margin: 20px 0; border-radius: 8px;">
+                  <span style="font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #2563EB;">${otp}</span>
+                </div>
+                <p style="color: #666;">This code expires in 24 hours.</p>
+                <p style="color: #666;">If you didn't create an account, please ignore this email.</p>
+                <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+                <p style="color: #999; font-size: 12px;">ArtisanConnect SA - Connecting Homeowners with Trusted Artisans</p>
+              </div>
+            `,
+          });
+          console.log('Email verification sent successfully:', emailResult);
+        } catch (emailError: any) {
+          console.error('Failed to send verification email:', emailError);
+          // Still return success to user, but log the error
+          return res.json({ 
+            success: true, 
+            message: "Verification code sent to your email",
+            warning: "Email delivery may have failed. Please check server logs."
+          });
+        }
+      } else {
+        console.warn('RESEND_API_KEY not configured - verification email not sent');
+        return res.status(500).json({ 
+          error: "Email service not configured",
+          message: "RESEND_API_KEY environment variable is not set. Please configure email service to send verification codes."
+        });
+      }
+      
+      res.json({ 
+        success: true, 
+        message: "Verification code sent to your email" 
+      });
+    } catch (error: any) {
+      console.error('Email verification request error:', error);
+      res.status(500).json({ error: "Failed to send verification email" });
+    }
+  });
+
+  // Verify email with OTP
+  app.post("/api/auth/verify-email", async (req: Request, res: Response) => {
+    try {
+      const { email, otp } = req.body;
+      
+      if (!email || !otp) {
+        return res.status(400).json({ error: "Email and OTP are required" });
+      }
+      
+      const token = await storage.getEmailVerificationToken(email.toLowerCase().trim(), otp);
+      
+      if (!token) {
+        return res.status(400).json({ error: "Invalid or expired code" });
+      }
+      
+      // Check if expired
+      if (new Date() > token.expiresAt) {
+        return res.status(400).json({ error: "Code has expired. Please request a new one." });
+      }
+      
+      // Update user as verified
+      await storage.updateUser(token.userId, { verified: true });
+      
+      // Mark token as used
+      await storage.markEmailVerificationTokenUsed(token.id);
+      
+      // Invalidate all other verification tokens for this user
+      await storage.invalidateUserEmailVerificationTokens(token.userId);
+      
+      // Get updated user
+      const user = await storage.getUser(token.userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      const { password, ...userWithoutPassword } = user;
+      
+      res.json({ 
+        success: true, 
+        message: "Email verified successfully",
+        user: userWithoutPassword
+      });
+    } catch (error: any) {
+      console.error('Email verification error:', error);
+      res.status(500).json({ error: "Failed to verify email" });
+    }
+  });
+
   // ==================== Job Routes ====================
   
   // Create job (client only)
-  app.post("/api/jobs", requireClient, async (req: Request, res: Response) => {
+  app.post("/api/jobs", requireClient, requireVerified, async (req: Request, res: Response) => {
     try {
       const user = req.user as User;
       console.log('Creating job for user:', user.id, 'with data:', req.body);
@@ -352,7 +516,7 @@ export async function registerRoutes(
   });
 
   // Get jobs by client
-  app.get("/api/jobs/my-jobs", requireClient, async (req: Request, res: Response) => {
+  app.get("/api/jobs/my-jobs", requireClient, requireVerified, async (req: Request, res: Response) => {
     try {
       const user = req.user as User;
       const jobs = await storage.getJobsByClient(user.id);
@@ -376,7 +540,7 @@ export async function registerRoutes(
   });
 
   // Update job
-  app.patch("/api/jobs/:id", requireClient, async (req: Request, res: Response) => {
+  app.patch("/api/jobs/:id", requireClient, requireVerified, async (req: Request, res: Response) => {
     try {
       const user = req.user as User;
       const job = await storage.getJob(req.params.id);
@@ -399,7 +563,7 @@ export async function registerRoutes(
   // ==================== Quote Routes ====================
   
   // Submit quote (artisan only)
-  app.post("/api/quotes", requireArtisan, async (req: Request, res: Response) => {
+  app.post("/api/quotes", requireArtisan, requireVerified, async (req: Request, res: Response) => {
     try {
       const user = req.user as User;
       const { billingType, hourlyRate, estimatedHours, amount, ...rest } = req.body;
@@ -467,7 +631,7 @@ export async function registerRoutes(
   });
 
   // Get artisan's quotes
-  app.get("/api/quotes/my-quotes", requireArtisan, async (req: Request, res: Response) => {
+  app.get("/api/quotes/my-quotes", requireArtisan, requireVerified, async (req: Request, res: Response) => {
     try {
       const user = req.user as User;
       const quotes = await storage.getQuotesByArtisan(user.id);
@@ -478,7 +642,7 @@ export async function registerRoutes(
   });
 
   // Accept quote (client only)
-  app.patch("/api/quotes/:id/accept", requireClient, async (req: Request, res: Response) => {
+  app.patch("/api/quotes/:id/accept", requireClient, requireVerified, async (req: Request, res: Response) => {
     try {
       const quote = await storage.updateQuote(req.params.id, { status: 'accepted' });
       
@@ -521,7 +685,7 @@ export async function registerRoutes(
   });
 
   // Get single payment
-  app.get("/api/payments/:id", isAuthenticated, async (req: Request, res: Response) => {
+  app.get("/api/payments/:id", isAuthenticated, requireVerified, async (req: Request, res: Response) => {
     try {
       const user = req.user as User;
       const payment = await storage.getPayment(req.params.id);
@@ -542,7 +706,7 @@ export async function registerRoutes(
   });
 
   // Release payment (client or admin)
-  app.patch("/api/payments/:id/release", isAuthenticated, async (req: Request, res: Response) => {
+  app.patch("/api/payments/:id/release", isAuthenticated, requireVerified, async (req: Request, res: Response) => {
     try {
       const user = req.user as User;
       const payment = await storage.getPayment(req.params.id);
@@ -582,7 +746,7 @@ export async function registerRoutes(
   // ==================== Message Routes ====================
   
   // Send message
-  app.post("/api/messages", isAuthenticated, async (req: Request, res: Response) => {
+  app.post("/api/messages", isAuthenticated, requireVerified, async (req: Request, res: Response) => {
     try {
       const user = req.user as User;
       const validatedData = insertMessageSchema.parse({
@@ -598,7 +762,7 @@ export async function registerRoutes(
   });
 
   // Get conversation between two users
-  app.get("/api/messages/:userId", isAuthenticated, async (req: Request, res: Response) => {
+  app.get("/api/messages/:userId", isAuthenticated, requireVerified, async (req: Request, res: Response) => {
     try {
       const user = req.user as User;
       const messages = await storage.getMessagesBetweenUsers(user.id, req.params.userId);
@@ -609,7 +773,7 @@ export async function registerRoutes(
   });
 
   // Get all conversations
-  app.get("/api/conversations", isAuthenticated, async (req: Request, res: Response) => {
+  app.get("/api/conversations", isAuthenticated, requireVerified, async (req: Request, res: Response) => {
     try {
       const user = req.user as User;
       const conversations = await storage.getConversations(user.id);
@@ -620,7 +784,7 @@ export async function registerRoutes(
   });
 
   // Mark message as read
-  app.patch("/api/messages/:id/read", isAuthenticated, async (req: Request, res: Response) => {
+  app.patch("/api/messages/:id/read", isAuthenticated, requireVerified, async (req: Request, res: Response) => {
     try {
       await storage.markMessageAsRead(req.params.id);
       res.json({ success: true });
@@ -632,7 +796,7 @@ export async function registerRoutes(
   // ==================== Review Routes ====================
   
   // Create review
-  app.post("/api/reviews", isAuthenticated, async (req: Request, res: Response) => {
+  app.post("/api/reviews", isAuthenticated, requireVerified, async (req: Request, res: Response) => {
     try {
       const user = req.user as User;
       const validatedData = insertReviewSchema.parse({
@@ -733,7 +897,7 @@ export async function registerRoutes(
   // ==================== Bank Details Routes ====================
   
   // Get bank details for current user
-  app.get("/api/bank-details", isAuthenticated, async (req: Request, res: Response) => {
+  app.get("/api/bank-details", isAuthenticated, requireVerified, async (req: Request, res: Response) => {
     try {
       const user = req.user as User;
       const details = await storage.getBankDetails(user.id);
@@ -744,7 +908,7 @@ export async function registerRoutes(
   });
 
   // Create or update bank details
-  app.post("/api/bank-details", isAuthenticated, async (req: Request, res: Response) => {
+  app.post("/api/bank-details", isAuthenticated, requireVerified, async (req: Request, res: Response) => {
     try {
       const user = req.user as User;
       const existingDetails = await storage.getBankDetails(user.id);
@@ -770,7 +934,7 @@ export async function registerRoutes(
   // ==================== Withdrawal Routes ====================
   
   // Get withdrawals for current user
-  app.get("/api/withdrawals", isAuthenticated, async (req: Request, res: Response) => {
+  app.get("/api/withdrawals", isAuthenticated, requireVerified, async (req: Request, res: Response) => {
     try {
       const user = req.user as User;
       const userWithdrawals = await storage.getWithdrawals(user.id);
@@ -781,7 +945,7 @@ export async function registerRoutes(
   });
 
   // Create withdrawal request
-  app.post("/api/withdrawals", isAuthenticated, async (req: Request, res: Response) => {
+  app.post("/api/withdrawals", isAuthenticated, requireVerified, async (req: Request, res: Response) => {
     try {
       const user = req.user as User;
       
@@ -910,7 +1074,7 @@ export async function registerRoutes(
   });
 
   // Create payment intent for escrow (when quote is accepted)
-  app.post("/api/payments/create-intent", isAuthenticated, async (req: Request, res: Response) => {
+  app.post("/api/payments/create-intent", isAuthenticated, requireVerified, async (req: Request, res: Response) => {
     try {
       const user = req.user as User;
       const { quoteId } = req.body;
@@ -966,7 +1130,7 @@ export async function registerRoutes(
   });
 
   // Confirm payment and accept quote (after successful Stripe payment)
-  app.post("/api/payments/confirm", isAuthenticated, async (req: Request, res: Response) => {
+  app.post("/api/payments/confirm", isAuthenticated, requireVerified, async (req: Request, res: Response) => {
     try {
       const user = req.user as User;
       const { paymentIntentId, quoteId } = req.body;
@@ -1032,7 +1196,7 @@ export async function registerRoutes(
   });
   
   // Record actual hours worked (for hourly billing - client only)
-  app.post("/api/payments/:id/record-hours", requireClient, async (req: Request, res: Response) => {
+  app.post("/api/payments/:id/record-hours", requireClient, requireVerified, async (req: Request, res: Response) => {
     try {
       const user = req.user as User;
       const paymentId = req.params.id;

@@ -233,6 +233,21 @@ class ApiClient {
     });
   }
 
+  // Email Verification
+  async sendVerificationEmail(email: string): Promise<PasswordResetResponse> {
+    return this.request<PasswordResetResponse>('/auth/send-verification', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  }
+
+  async verifyEmail(email: string, otp: string): Promise<{ success: boolean; message: string; user: User }> {
+    return this.request<{ success: boolean; message: string; user: User }>('/auth/verify-email', {
+      method: 'POST',
+      body: JSON.stringify({ email, otp }),
+    });
+  }
+
   // Jobs
   async createJob(data: {
     title: string;

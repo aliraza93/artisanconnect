@@ -29,3 +29,20 @@ export function requireRole(...roles: string[]) {
 export const requireClient = requireRole("client", "admin");
 export const requireArtisan = requireRole("artisan", "admin");
 export const requireAdmin = requireRole("admin");
+
+// Middleware to require email verification
+export function requireVerified(req: Request, res: Response, next: NextFunction) {
+  if (!req.isAuthenticated()) {
+    return res.status(401).json({ error: "Not authenticated" });
+  }
+
+  const user = req.user as User;
+  if (!user.verified) {
+    return res.status(403).json({ 
+      error: "Email verification required",
+      requiresVerification: true 
+    });
+  }
+
+  next();
+}

@@ -222,3 +222,18 @@ export const passwordResetTokens = pgTable('password_reset_tokens', {
 export const insertPasswordResetTokenSchema = createInsertSchema(passwordResetTokens).omit({ id: true, createdAt: true });
 export type InsertPasswordResetToken = z.infer<typeof insertPasswordResetTokenSchema>;
 export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
+
+// Email Verification Tokens Table (for email verification on signup)
+export const emailVerificationTokens = pgTable('email_verification_tokens', {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar().notNull().references(() => users.id),
+  email: text().notNull(),
+  otp: text().notNull(),
+  expiresAt: timestamp().notNull(),
+  used: boolean().notNull().default(false),
+  createdAt: timestamp().notNull().defaultNow(),
+});
+
+export const insertEmailVerificationTokenSchema = createInsertSchema(emailVerificationTokens).omit({ id: true, createdAt: true });
+export type InsertEmailVerificationToken = z.infer<typeof insertEmailVerificationTokenSchema>;
+export type EmailVerificationToken = typeof emailVerificationTokens.$inferSelect;
