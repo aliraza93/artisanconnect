@@ -1369,10 +1369,31 @@ export async function registerRoutes(
       const { ObjectStorageService } = await import('./objectStorage');
       const objectStorageService = new ObjectStorageService();
       const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+      
+      if (!uploadURL) {
+        console.error("No upload URL returned from ObjectStorageService");
+        return res.status(500).json({ error: "Failed to generate upload URL" });
+      }
+      
       res.json({ uploadURL });
     } catch (error) {
       console.error("Error getting upload URL:", error);
-      res.status(500).json({ error: "Failed to get upload URL" });
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      
+      // Check if it's a configuration error
+      if (errorMessage.includes("PRIVATE_OBJECT_DIR")) {
+        console.error("Configuration Error: PRIVATE_OBJECT_DIR environment variable is not set.");
+        console.error("Please set PRIVATE_OBJECT_DIR in your environment variables or .env file.");
+        return res.status(500).json({ 
+          error: "Upload service not configured",
+          details: "PRIVATE_OBJECT_DIR environment variable is not set. Please contact the administrator."
+        });
+      }
+      
+      res.status(500).json({ 
+        error: "Failed to get upload URL",
+        details: errorMessage 
+      });
     }
   });
 

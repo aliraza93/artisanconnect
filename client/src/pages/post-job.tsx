@@ -13,9 +13,9 @@ import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
 import { LoginModal } from "@/components/auth/login-modal";
 import { SignupModal } from "@/components/auth/signup-modal";
-import { ObjectUploader } from "@/components/ObjectUploader";
-import { Camera, X } from "lucide-react";
-import type { UploadResult } from "@uppy/core";
+import { SimpleImageUploader } from "@/components/SimpleImageUploader";
+import { X, Camera } from "lucide-react";
+import { PlacesAutocomplete } from "@/components/maps/places-autocomplete";
 
 export default function PostJob() {
   const { toast } = useToast();
@@ -31,6 +31,9 @@ export default function PostJob() {
     description: "",
     category: "",
     location: "",
+    address: "",
+    latitude: null as number | null,
+    longitude: null as number | null,
     budget: "",
     needsLogistics: false,
   });
@@ -41,25 +44,8 @@ export default function PostJob() {
     }
   }, [loading, user]);
 
-  const handleGetUploadParameters = async () => {
-    const response = await fetch('/api/objects/upload', {
-      method: 'POST',
-      credentials: 'include',
-    });
-    const data = await response.json();
-    return {
-      method: 'PUT' as const,
-      url: data.uploadURL,
-    };
-  };
-
-  const handleUploadComplete = (result: UploadResult<Record<string, unknown>, Record<string, unknown>>) => {
-    const newImages = result.successful?.map(file => file.uploadURL as string) || [];
-    setUploadedImages(prev => [...prev, ...newImages]);
-    toast({
-      title: "Image uploaded",
-      description: "Your photo has been added to the job.",
-    });
+  const handleUploadComplete = (imageURLs: string[]) => {
+    setUploadedImages(prev => [...prev, ...imageURLs]);
   };
 
   const removeImage = (index: number) => {
@@ -90,6 +76,9 @@ export default function PostJob() {
         description: formData.description,
         category: formData.category,
         location: formData.location,
+        address: formData.address || undefined,
+        latitude: formData.latitude !== null ? String(formData.latitude) : undefined,
+        longitude: formData.longitude !== null ? String(formData.longitude) : undefined,
         budget: formData.budget || undefined,
         needsLogistics: formData.needsLogistics,
       });
@@ -143,7 +132,7 @@ export default function PostJob() {
                   <Label htmlFor="category" className="text-base font-medium">Service Category</Label>
                   <Select 
                     value={formData.category}
-                    onValueChange={(value) => setFormData({ ...formData, category: value })}
+                    onValueChange={(value) => setFormData((prev) => ({ ...prev, category: value }))}
                     required
                   >
                     <SelectTrigger className="h-12 text-base" data-testid="select-category">
@@ -174,7 +163,7 @@ export default function PostJob() {
                     placeholder="e.g., Fix leaking tap in kitchen" 
                     className="h-12 text-base" 
                     value={formData.title}
-                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, title: e.target.value }))}
                     required 
                     data-testid="input-title"
                   />
@@ -187,23 +176,44 @@ export default function PostJob() {
                     placeholder="Describe the issue in detail. Include specific requirements or measurements if known." 
                     className="min-h-[150px] text-base resize-none" 
                     value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
                     required
                     data-testid="input-description"
                   />
                 </div>
 
+                <div className="space-y-2">
+                  <PlacesAutocomplete
+                    id="address"
+                    label="Job Address"
+                    value={formData.address || formData.location}
+                    onChange={(address, lat, lng) => {
+                      setFormData((prev) => ({
+                        ...prev,
+                        address: address,
+                        location: address.split(',')[0] || address, // Use first part as location/suburb
+                        latitude: lat,
+                        longitude: lng,
+                      }));
+                    }}
+                    placeholder="Enter the job address"
+                    required
+                    countryRestriction="za"
+                  />
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <Label htmlFor="location" className="text-base font-medium">Location (Suburb)</Label>
+                    <Label htmlFor="location" className="text-base font-medium">Location (Suburb) - Auto-filled</Label>
                     <Input 
                       id="location" 
                       placeholder="e.g., Sandton, Johannesburg" 
-                      className="h-12 text-base" 
+                      className="h-12 text-base bg-slate-50" 
                       value={formData.location}
-                      onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                      onChange={(e) => setFormData((prev) => ({ ...prev, location: e.target.value }))}
                       required 
                       data-testid="input-location"
+                      readOnly
                     />
                   </div>
                   <div className="space-y-2">
@@ -213,7 +223,7 @@ export default function PostJob() {
                       placeholder="R 0.00" 
                       className="h-12 text-base" 
                       value={formData.budget}
-                      onChange={(e) => setFormData({ ...formData, budget: e.target.value })}
+                      onChange={(e) => setFormData((prev) => ({ ...prev, budget: e.target.value }))}
                       data-testid="input-budget"
                     />
                   </div>
@@ -223,7 +233,7 @@ export default function PostJob() {
                   <Checkbox 
                     id="logistics" 
                     checked={formData.needsLogistics}
-                    onCheckedChange={(checked) => setFormData({ ...formData, needsLogistics: checked as boolean })}
+                    onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, needsLogistics: checked as boolean }))}
                     data-testid="checkbox-logistics"
                   />
                   <Label htmlFor="logistics" className="text-sm text-slate-600 font-normal">
@@ -232,53 +242,66 @@ export default function PostJob() {
                 </div>
 
                 {/* Image Upload Section */}
-                <div className="space-y-3">
-                  <Label className="text-base font-medium">Photos (Optional)</Label>
-                  <p className="text-sm text-slate-500">
-                    Add photos to help artisans understand the job better
-                  </p>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label className="text-base font-medium">Photos (Optional)</Label>
+                    <p className="text-sm text-slate-500">
+                      Add photos to help artisans understand the job better (max 5 photos)
+                    </p>
+                  </div>
                   
                   {/* Uploaded Images Preview */}
                   {uploadedImages.length > 0 && (
-                    <div className="flex flex-wrap gap-3" data-testid="uploaded-images-container">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4" data-testid="uploaded-images-container">
                       {uploadedImages.map((url, index) => (
-                        <div key={index} className="relative group">
+                        <div key={index} className="relative group aspect-square">
                           <img 
                             src={url} 
                             alt={`Uploaded ${index + 1}`}
-                            className="w-24 h-24 object-cover rounded-lg border border-slate-200"
+                            className="w-full h-full object-cover rounded-lg border border-slate-200 shadow-sm"
                             data-testid={`uploaded-image-${index}`}
                           />
                           <button
                             type="button"
                             onClick={() => removeImage(index)}
-                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white rounded-full p-1.5 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-10"
                             data-testid={`button-remove-image-${index}`}
+                            aria-label="Remove image"
                           >
-                            <X className="h-3 w-3" />
+                            <X className="h-4 w-4" />
                           </button>
+                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 rounded-lg transition-colors" />
                         </div>
                       ))}
                     </div>
                   )}
 
-                  {user && uploadedImages.length < 5 && (
-                    <ObjectUploader
-                      maxNumberOfFiles={5}
+                  {user && (
+                    <SimpleImageUploader
+                      maxFiles={5}
                       maxFileSize={10485760}
-                      onGetUploadParameters={handleGetUploadParameters}
-                      onComplete={handleUploadComplete}
-                      buttonClassName="flex items-center gap-2"
-                    >
-                      <Camera className="h-4 w-4" />
-                      <span>Add Photos</span>
-                    </ObjectUploader>
+                      onUploadComplete={handleUploadComplete}
+                      existingImages={uploadedImages}
+                    />
                   )}
                   
                   {!user && (
-                    <p className="text-sm text-slate-400 italic">
-                      Sign in to upload photos
-                    </p>
+                    <div className="border-2 border-dashed border-slate-200 rounded-lg p-8 text-center bg-slate-50/50">
+                      <div className="flex items-center justify-center w-12 h-12 rounded-full bg-slate-100 mx-auto mb-3">
+                        <Camera className="h-6 w-6 text-slate-300" />
+                      </div>
+                      <p className="text-sm text-slate-400">
+                        Sign in to upload photos
+                      </p>
+                    </div>
+                  )}
+                  
+                  {uploadedImages.length >= 5 && (
+                    <div className="text-center py-3 px-4 bg-slate-50 rounded-lg border border-slate-200">
+                      <p className="text-sm text-slate-600 font-medium">
+                        Maximum of 5 photos reached
+                      </p>
+                    </div>
                   )}
                 </div>
 

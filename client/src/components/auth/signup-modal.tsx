@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { api } from "@/lib/api";
 import { Mail, CheckCircle2 } from "lucide-react";
+import { PlacesAutocomplete } from "@/components/maps/places-autocomplete";
 
 interface SignupModalProps {
   open: boolean;
@@ -36,6 +37,9 @@ export function SignupModal({ open, onOpenChange, onSwitchToLogin }: SignupModal
     category: "",
     bio: "",
     location: "",
+    address: "",
+    latitude: null as number | null,
+    longitude: null as number | null,
     yearsExperience: "",
   });
   
@@ -59,6 +63,9 @@ export function SignupModal({ open, onOpenChange, onSwitchToLogin }: SignupModal
           category: artisanData.category,
           bio: artisanData.bio || undefined,
           location: artisanData.location || undefined,
+          address: artisanData.address || undefined,
+          latitude: artisanData.latitude !== null ? String(artisanData.latitude) : undefined,
+          longitude: artisanData.longitude !== null ? String(artisanData.longitude) : undefined,
           yearsExperience: artisanData.yearsExperience ? parseInt(artisanData.yearsExperience) : undefined,
         };
       }
@@ -219,7 +226,7 @@ export function SignupModal({ open, onOpenChange, onSwitchToLogin }: SignupModal
                 <Label htmlFor="category">Category</Label>
                 <Select
                   value={artisanData.category}
-                  onValueChange={(value) => setArtisanData({ ...artisanData, category: value })}
+                  onValueChange={(value) => setArtisanData((prev) => ({ ...prev, category: value }))}
                   required
                 >
                   <SelectTrigger data-testid="select-category">
@@ -243,13 +250,22 @@ export function SignupModal({ open, onOpenChange, onSwitchToLogin }: SignupModal
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="location">Location</Label>
-                <Input
-                  id="location"
-                  placeholder="Johannesburg, Gauteng"
-                  value={artisanData.location}
-                  onChange={(e) => setArtisanData({ ...artisanData, location: e.target.value })}
-                  data-testid="input-location"
+                <PlacesAutocomplete
+                  id="artisan-address"
+                  label="Location/Address"
+                  value={artisanData.address || artisanData.location}
+                  onChange={(address, lat, lng) => {
+                    // Preserve all existing artisanData fields when updating address
+                    setArtisanData((prev) => ({
+                      ...prev,
+                      address: address,
+                      location: address.split(',')[0] || address, // Use first part as location
+                      latitude: lat,
+                      longitude: lng,
+                    }));
+                  }}
+                  placeholder="Enter your location or address"
+                  countryRestriction="za"
                 />
               </div>
               
@@ -260,7 +276,7 @@ export function SignupModal({ open, onOpenChange, onSwitchToLogin }: SignupModal
                   type="number"
                   placeholder="5"
                   value={artisanData.yearsExperience}
-                  onChange={(e) => setArtisanData({ ...artisanData, yearsExperience: e.target.value })}
+                  onChange={(e) => setArtisanData((prev) => ({ ...prev, yearsExperience: e.target.value }))}
                   min="0"
                   data-testid="input-experience"
                 />
@@ -272,7 +288,7 @@ export function SignupModal({ open, onOpenChange, onSwitchToLogin }: SignupModal
                   id="bio"
                   placeholder="Tell clients about your expertise..."
                   value={artisanData.bio}
-                  onChange={(e) => setArtisanData({ ...artisanData, bio: e.target.value })}
+                  onChange={(e) => setArtisanData((prev) => ({ ...prev, bio: e.target.value }))}
                   rows={3}
                   data-testid="input-bio"
                 />
