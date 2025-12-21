@@ -20,6 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
+import { MapView } from "@/components/maps/map-view";
 
 export default function Dashboard() {
   const { user, loading: authLoading, refreshUser } = useAuth();
@@ -1266,6 +1267,20 @@ export default function Dashboard() {
                     <h4 className="font-medium mb-2">Description</h4>
                     <p className="text-sm text-slate-600">{job.description}</p>
                   </div>
+                  
+                  {job.address && job.latitude && job.longitude && (
+                    <div>
+                      <h4 className="font-medium mb-2">Location</h4>
+                      <p className="text-sm text-slate-600 mb-3">{job.address}</p>
+                      <MapView
+                        latitude={parseFloat(job.latitude)}
+                        longitude={parseFloat(job.longitude)}
+                        address={job.address}
+                        height="300px"
+                        markerTitle={job.title}
+                      />
+                    </div>
+                  )}
                   
                   <div className="border-t pt-4">
                     <h4 className="font-medium mb-4 flex items-center gap-2">

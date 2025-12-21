@@ -116,3 +116,162 @@
     @apply font-heading font-bold tracking-tight;
   }
 }
+
+/* Google Places Autocomplete Styling */
+.pac-container {
+  background-color: white !important;
+  border: 1px solid hsl(var(--border)) !important;
+  border-radius: 0.5rem !important;
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1) !important;
+  font-family: var(--font-sans) !important;
+  margin-top: 4px !important;
+  overflow: hidden !important;
+  z-index: 9999 !important;
+  max-height: 320px !important;
+  overflow-y: auto !important;
+  padding: 4px 0 !important;
+}
+
+.pac-item {
+  border-top: 1px solid hsl(var(--border) / 0.5) !important;
+  cursor: pointer !important;
+  padding: 12px 16px !important;
+  font-size: 14px !important;
+  line-height: 1.5 !important;
+  color: hsl(var(--foreground)) !important;
+  transition: all 0.15s ease-in-out !important;
+  user-select: none !important;
+  display: flex !important;
+  align-items: center !important;
+  min-height: 48px !important;
+  position: relative !important;
+  pointer-events: auto !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+/* Ensure all child elements don't block pointer events */
+.pac-item * {
+  pointer-events: none !important;
+}
+
+.pac-item:first-child {
+  border-top: none !important;
+}
+
+.pac-item:hover {
+  background-color: hsl(var(--accent)) !important;
+  cursor: pointer !important;
+  transform: translateX(2px) !important;
+}
+
+.pac-item-selected {
+  background-color: hsl(var(--primary) / 0.1) !important;
+  border-left: 3px solid hsl(var(--primary)) !important;
+  padding-left: 13px !important;
+}
+
+.pac-item:active {
+  background-color: hsl(var(--primary) / 0.15) !important;
+  transform: translateX(1px) !important;
+}
+
+.pac-item-query {
+  font-size: 14px !important;
+  color: hsl(var(--foreground)) !important;
+  padding-right: 8px !important;
+  font-weight: 500 !important;
+}
+
+.pac-matched {
+  font-weight: 600 !important;
+  color: hsl(var(--primary)) !important;
+  background-color: hsl(var(--primary) / 0.1) !important;
+  padding: 0 2px !important;
+  border-radius: 2px !important;
+}
+
+.pac-icon {
+  margin-right: 12px !important;
+  margin-top: 2px !important;
+  width: 15px !important;
+  height: 20px !important;
+  flex-shrink: 0 !important;
+}
+
+.pac-icon-marker {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='15' height='20' viewBox='0 0 15 20'%3E%3Cpath fill='%232563EB' d='M7.5 0C3.36 0 0 3.36 0 7.5c0 5.25 7.5 12.5 7.5 12.5S15 12.75 15 7.5C15 3.36 11.64 0 7.5 0zm0 10c-1.38 0-2.5-1.12-2.5-2.5S6.12 5 7.5 5 10 6.12 10 7.5 8.88 10 7.5 10z'/%3E%3C/svg%3E") !important;
+  background-size: contain !important;
+  background-repeat: no-repeat !important;
+  background-position: center !important;
+}
+
+.pac-logo:after {
+  display: none !important;
+}
+
+/* Scrollbar styling for dropdown */
+.pac-container::-webkit-scrollbar {
+  width: 8px !important;
+}
+
+.pac-container::-webkit-scrollbar-track {
+  background: hsl(var(--muted)) !important;
+  border-radius: 4px !important;
+}
+
+.pac-container::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.3) !important;
+  border-radius: 4px !important;
+}
+
+.pac-container::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.5) !important;
+}
+
+/* Ensure the container itself is clickable */
+.pac-container {
+  pointer-events: auto !important;
+}
+
+/* Make sure nested text/element elements don't interfere with clicks */
+.pac-item-query,
+.pac-matched,
+.pac-icon,
+.pac-icon-marker {
+  pointer-events: none !important;
+}
+
+/* Hide Uppy drag-drop area when modal is closed */
+.uppy-DragDrop-container:not(.uppy-Dashboard--modal .uppy-DragDrop-container) {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* Hide Uppy elements outside the modal */
+body > .uppy-DragDrop-container,
+body > .uppy-DragDrop-container[aria-hidden="true"] {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  position: absolute !important;
+  left: -9999px !important;
+  opacity: 0 !important;
+}
+
+/* Prevent Uppy browse button from receiving focus when typing */
+.uppy-Dashboard-browse:not(.uppy-Dashboard--modal .uppy-Dashboard-browse),
+.uppy-DragDrop-container:not(.uppy-Dashboard--modal .uppy-DragDrop-container) button,
+.uppy-DragDrop-container:not(.uppy-Dashboard--modal .uppy-DragDrop-container) a {
+  pointer-events: none !important;
+  outline: none !important;
+}
+
+/* Set tabindex via JavaScript or inline styles - CSS can't set tabindex */
+
+/* Only allow interaction when modal is open */
+.uppy-Dashboard--modal[aria-hidden="false"] .uppy-Dashboard-browse,
+.uppy-Dashboard--modal[aria-hidden="false"] .uppy-DragDrop-container button,
+.uppy-Dashboard--modal[aria-hidden="false"] .uppy-DragDrop-container a {
+  pointer-events: auto !important;
+}

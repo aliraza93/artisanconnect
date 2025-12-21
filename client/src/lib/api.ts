@@ -24,6 +24,9 @@ export interface ArtisanProfile {
   certifications: string[] | null;
   yearsExperience: number | null;
   location: string | null;
+  address: string | null;
+  latitude: string | null;
+  longitude: string | null;
   verified: boolean;
   createdAt: string;
 }
@@ -35,6 +38,9 @@ export interface Job {
   description: string;
   category: string;
   location: string;
+  address: string | null;
+  latitude: string | null;
+  longitude: string | null;
   budget: string | null;
   status: 'open' | 'quoted' | 'in_progress' | 'completed' | 'cancelled' | 'disputed';
   needsLogistics: boolean;
@@ -188,6 +194,9 @@ class ApiClient {
       certifications?: string[];
       yearsExperience?: number;
       location?: string;
+      address?: string;
+      latitude?: number;
+      longitude?: number;
     };
   }): Promise<User> {
     return this.request<User>('/auth/signup', {
@@ -254,6 +263,9 @@ class ApiClient {
     description: string;
     category: string;
     location: string;
+    address?: string;
+    latitude?: number;
+    longitude?: number;
     budget?: string;
     needsLogistics?: boolean;
   }): Promise<Job> {
