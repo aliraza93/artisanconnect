@@ -80,7 +80,7 @@ export async function registerRoutes(
             : 'You can now post jobs and connect with trusted artisans.';
           
           const emailResult = await resend.emails.send({
-            from: 'ArtisanConnect SA <onboarding@resend.dev>',
+            from: 'ArtisanConnect SA <noreply@artisanconnect.xyz>',
             to: user.email,
             subject: 'Welcome to ArtisanConnect SA - Verify Your Email',
             html: `
@@ -229,7 +229,7 @@ export async function registerRoutes(
           console.log(`Sending password reset email to: ${user.email}`);
           
           const emailResult = await resend.emails.send({
-            from: 'ArtisanConnect SA <onboarding@resend.dev>',
+            from: 'ArtisanConnect SA <noreply@artisanconnect.xyz>',
             to: user.email,
             subject: 'Password Reset Code - ArtisanConnect SA',
             html: `
@@ -390,7 +390,7 @@ export async function registerRoutes(
           console.log(`Sending email verification to: ${user.email}`);
           
           const emailResult = await resend.emails.send({
-            from: 'ArtisanConnect SA <onboarding@resend.dev>',
+            from: 'ArtisanConnect SA <noreply@artisanconnect.xyz>',
             to: user.email,
             subject: 'Verify Your Email - ArtisanConnect SA',
             html: `
