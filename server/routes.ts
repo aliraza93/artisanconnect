@@ -1381,14 +1381,14 @@ export async function registerRoutes(
     try {
       const { ObjectStorageService } = await import('./objectStorage');
       const objectStorageService = new ObjectStorageService();
-      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+      const result = await objectStorageService.getObjectEntityUploadURL();
       
-      if (!uploadURL) {
+      if (!result.uploadURL) {
         console.error("No upload URL returned from ObjectStorageService");
         return res.status(500).json({ error: "Failed to generate upload URL" });
       }
       
-      res.json({ uploadURL });
+      res.json({ uploadURL: result.uploadURL, objectPath: result.objectPath });
     } catch (error) {
       console.error("Error getting upload URL:", error);
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
@@ -1421,9 +1421,10 @@ export async function registerRoutes(
         return res.status(400).json({ error: "imageURL is required" });
       }
 
-      // Validate URL is from Google Cloud Storage (our object storage)
-      if (!imageURL.startsWith('https://storage.googleapis.com/')) {
-        return res.status(400).json({ error: "Invalid image URL - must be from our storage" });
+      // Validate image path is from our object storage (either full GCS URL or object path)
+      const isValidPath = imageURL.startsWith('/objects/') || imageURL.startsWith('https://storage.googleapis.com/');
+      if (!isValidPath) {
+        return res.status(400).json({ error: "Invalid image path - must be from our storage" });
       }
 
       const job = await storage.getJob(jobId);

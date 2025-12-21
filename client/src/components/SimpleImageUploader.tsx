@@ -98,9 +98,9 @@ export function SimpleImageUploader({
           }
 
           const data = await response.json();
-          const uploadURL = data.uploadURL;
+          const { uploadURL, objectPath } = data;
           
-          if (!uploadURL) {
+          if (!uploadURL || !objectPath) {
             throw new Error('No upload URL received from server');
           }
 
@@ -117,8 +117,8 @@ export function SimpleImageUploader({
             throw new Error('Failed to upload file');
           }
 
-          // The uploadURL is the final image URL
-          uploadedURLs.push(uploadURL);
+          // Use the objectPath as the permanent image URL (served via /objects/* route)
+          uploadedURLs.push(objectPath);
         } catch (error) {
           console.error('Error uploading file:', error);
           const errorMessage = error instanceof Error ? error.message : 'Unknown error';

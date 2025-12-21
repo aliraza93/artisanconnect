@@ -115,7 +115,7 @@ export class ObjectStorageService {
     }
   }
 
-  async getObjectEntityUploadURL(): Promise<string> {
+  async getObjectEntityUploadURL(): Promise<{ uploadURL: string; objectPath: string }> {
     const privateObjectDir = this.getPrivateObjectDir();
     if (!privateObjectDir) {
       throw new Error(
@@ -129,11 +129,28 @@ export class ObjectStorageService {
 
     const { bucketName, objectName } = parseObjectPath(fullPath);
 
-    return signObjectURL({
+    const uploadURL = await signObjectURL({
       bucketName,
       objectName,
       method: "PUT",
       ttlSec: 900,
+    });
+
+    return {
+      uploadURL,
+      objectPath: `/objects/uploads/${objectId}`,
+    };
+  }
+
+  async getSignedReadURL(objectPath: string): Promise<string> {
+    const file = await this.getObjectEntityFile(objectPath);
+    const { bucketName, objectName } = parseObjectPath(`${this.getPrivateObjectDir()}/${objectPath.replace('/objects/', '')}`);
+    
+    return signObjectURL({
+      bucketName,
+      objectName,
+      method: "GET",
+      ttlSec: 3600, // 1 hour expiry for viewing
     });
   }
 
@@ -287,7 +304,4 @@ async function signObjectURL({
     }
     throw error;
   }
-
-  const { signed_url: signedURL } = await response.json();
-  return signedURL;
 }
