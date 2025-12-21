@@ -40,13 +40,18 @@ export function MapView({
     loadGoogleMaps()
       .then(() => {
         setIsLoaded(true);
-        initializeMap();
       })
       .catch((err) => {
         console.error('Failed to load Google Maps:', err);
-        setError("Google Maps failed to load. Please check your API key configuration.");
+        setError(err.message || "Google Maps failed to load. Please check your API key configuration.");
       });
-  }, [latitude, longitude, zoom]);
+  }, []);
+  
+  useEffect(() => {
+    if (isLoaded && window.google) {
+      initializeMap();
+    }
+  }, [isLoaded, latitude, longitude, zoom]);
 
   const initializeMap = () => {
     if (!mapRef.current || !window.google) return;
