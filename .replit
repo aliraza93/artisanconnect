@@ -44,3 +44,12 @@ waitForPort = 5000
 mockupState = "FULLSTACK"
 integrations = ["javascript_database:1.0.0", "stripe:1.0.0", "javascript_object_storage:1.0.0"]
 expertMode = true
+
+[objectStorage]
+defaultBucketID = "replit-objstore-2954da8e-56f1-4afa-a8b8-d2ad7ffb52c6"
+
+[userenv]
+
+[userenv.shared]
+PRIVATE_OBJECT_DIR = "replit-objstore-2954da8e-56f1-4afa-a8b8-d2ad7ffb52c6"
+PUBLIC_OBJECT_SEARCH_PATHS = "replit-objstore-2954da8e-56f1-4afa-a8b8-d2ad7ffb52c6"
