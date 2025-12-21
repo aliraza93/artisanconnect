@@ -119,17 +119,30 @@ export async function registerRoutes(
         console.error('To enable email sending, set RESEND_API_KEY in your environment variables');
       }
 
-      // Log in the user
-      req.login(user, (err) => {
-        if (err) {
-          return res.status(500).json({ error: "Login failed after signup" });
+      // Log in the user - save session first to ensure it exists
+      req.session.save((saveErr) => {
+        if (saveErr) {
+          console.error('Session save error during signup:', saveErr);
+          // Still return success - user was created, they can log in manually
+          const { password, ...userWithoutPassword } = user;
+          return res.status(201).json(userWithoutPassword);
         }
         
-        // Don't send password back
-        const { password, ...userWithoutPassword } = user;
-        res.status(201).json(userWithoutPassword);
+        req.login(user, (err) => {
+          if (err) {
+            console.error('Login error after signup:', err);
+            // Still return success - user was created, they can log in manually
+            const { password, ...userWithoutPassword } = user;
+            return res.status(201).json(userWithoutPassword);
+          }
+          
+          // Don't send password back
+          const { password, ...userWithoutPassword } = user;
+          res.status(201).json(userWithoutPassword);
+        });
       });
     } catch (error: any) {
+      console.error('Signup error:', error);
       res.status(400).json({ error: error.message || "Invalid signup data" });
     }
   });
