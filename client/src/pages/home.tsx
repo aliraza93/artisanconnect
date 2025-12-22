@@ -8,6 +8,7 @@ import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { LoginModal } from "@/components/auth/login-modal";
 import { SignupModal } from "@/components/auth/signup-modal";
+import { useSEO } from "@/hooks/use-seo";
 
 // Import generated images
 import heroImage from "@assets/generated_images/homeowner_shaking_hands_with_a_professional_artisan.png";
@@ -20,6 +21,11 @@ export default function Home() {
   const [, setLocation] = useLocation();
   const [showLogin, setShowLogin] = useState(false);
   const [showSignup, setShowSignup] = useState(false);
+
+  useSEO({
+    title: 'Hire Trusted Plumbers, Electricians & Artisans in South Africa',
+    description: 'Connect with vetted South African artisans - plumbers, electricians, builders, solar installers. Get competitive quotes, secure escrow payments, and verified professionals.'
+  });
 
   const handlePostJob = () => {
     if (user) {

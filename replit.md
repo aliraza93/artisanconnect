@@ -8,13 +8,16 @@ ArtisanConnect SA is a production-ready Progressive Web App (PWA) marketplace co
 
 ## Recent Changes
 
-### December 22, 2025 - One-Way Artisan Review System
+### December 22, 2025 - One-Way Artisan Review System & SEO Enhancements
 - ✅ **Review Dialog** - Clients can rate artisans (1-5 stars) with optional comments after job completion
 - ✅ **Duplicate Prevention** - System checks if client already reviewed the job to prevent multiple reviews
 - ✅ **Review Display Components** - StarRating and ArtisanReviewsList components for displaying ratings
 - ✅ **Dashboard Integration** - Review button appears on completed jobs for clients to rate artisans
 - ✅ **Average Rating Calculation** - Artisan ratings automatically updated after each review
 - ✅ **API Endpoints** - /api/jobs/:jobId/my-review and /api/jobs/:jobId/reviews added
+- ✅ **SEO Meta Tags** - Title, description, keywords, Open Graph, Twitter Cards, geo tags for South Africa
+- ✅ **Dynamic SEO Hook** - useSEO hook for page-specific titles and descriptions
+- ✅ **Stripe Integration** - Connected Stripe sandbox for payment processing
 
 ### December 8, 2025 - Artisan Ratings/Reviews Visibility & UX Improvements
 - ✅ **Artisan ratings in quotes** - Clients can now see artisan name, rating, review count, years of experience, and verification status when viewing quotes

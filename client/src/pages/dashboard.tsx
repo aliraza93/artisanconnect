@@ -22,11 +22,17 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { MapView } from "@/components/maps/map-view";
 import { ReviewDialog, StarRating } from "@/components/review-dialog";
+import { useSEO } from "@/hooks/use-seo";
 
 export default function Dashboard() {
   const { user, loading: authLoading, refreshUser } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+
+  useSEO({
+    title: 'Dashboard - Manage Your Jobs & Quotes',
+    description: 'Manage your home projects, view quotes from artisans, track payments, and communicate with service providers.'
+  });
   
   const [jobs, setJobs] = useState<Job[]>([]);
   const [quotes, setQuotes] = useState<{[jobId: string]: Quote[]}>({});

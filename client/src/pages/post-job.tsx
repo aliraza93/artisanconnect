@@ -16,6 +16,7 @@ import { SignupModal } from "@/components/auth/signup-modal";
 import { SimpleImageUploader } from "@/components/SimpleImageUploader";
 import { X, Camera } from "lucide-react";
 import { PlacesAutocomplete } from "@/components/maps/places-autocomplete";
+import { useSEO } from "@/hooks/use-seo";
 
 export default function PostJob() {
   const { toast } = useToast();
@@ -25,6 +26,11 @@ export default function PostJob() {
   const [showLogin, setShowLogin] = useState(false);
   const [showSignup, setShowSignup] = useState(false);
   const [uploadedImages, setUploadedImages] = useState<string[]>([]);
+
+  useSEO({
+    title: 'Post a Job - Find Artisans Near You',
+    description: 'Post your home project and receive competitive quotes from verified artisans. Plumbing, electrical, building work and more.'
+  });
 
   const [formData, setFormData] = useState({
     title: "",
