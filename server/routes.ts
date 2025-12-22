@@ -1323,20 +1323,24 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Please record actual hours worked before releasing payment" });
       }
       
-      const { getUncachableStripeClient } = await import('./stripeClient');
-      const stripe = await getUncachableStripeClient();
-      
       // For hourly billing, use the finalTotal; for fixed, use totalAmount
       const releaseAmount = payment.billingType === 'hourly' && payment.finalTotal
         ? payment.finalTotal
         : payment.totalAmount;
       
-      // Capture the payment
+      // Try to capture the Stripe payment if configured
+      let stripeProcessed = false;
       if (payment.stripePaymentIntentId) {
-        // For hourly billing, we may need to capture a different amount
-        await stripe.paymentIntents.capture(payment.stripePaymentIntentId, {
-          amount_to_capture: Math.round(parseFloat(releaseAmount) * 100),
-        });
+        try {
+          const { getUncachableStripeClient } = await import('./stripeClient');
+          const stripe = await getUncachableStripeClient();
+          await stripe.paymentIntents.capture(payment.stripePaymentIntentId, {
+            amount_to_capture: Math.round(parseFloat(releaseAmount) * 100),
+          });
+          stripeProcessed = true;
+        } catch (stripeError: any) {
+          console.log('Stripe not available, proceeding without capture:', stripeError.message);
+        }
       }
       
       // Update payment status with final amounts
