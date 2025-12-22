@@ -30,24 +30,21 @@ async function initStripe() {
 
   try {
     console.log('Initializing Stripe schema...');
-    await runMigrations({ 
-      databaseUrl,
-      schema: 'stripe'
-    });
+    await runMigrations({ databaseUrl });
     console.log('Stripe schema ready');
 
     const stripeSync = await getStripeSync();
 
     console.log('Setting up managed webhook...');
     const webhookBaseUrl = `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}`;
-    const { webhook, uuid } = await stripeSync.findOrCreateManagedWebhook(
-      `${webhookBaseUrl}/api/stripe/webhook`,
-      {
-        enabled_events: ['*'],
-        description: 'Managed webhook for ArtisanConnect payments',
-      }
+    const result = await stripeSync.findOrCreateManagedWebhook(
+      `${webhookBaseUrl}/api/stripe/webhook`
     );
-    console.log(`Webhook configured: ${webhook.url} (UUID: ${uuid})`);
+    if (result?.webhook?.url) {
+      console.log(`Webhook configured: ${result.webhook.url}`);
+    } else {
+      console.log('Webhook setup completed');
+    }
 
     console.log('Syncing Stripe data...');
     stripeSync.syncBackfill()
