@@ -840,6 +840,27 @@ export async function registerRoutes(
     }
   });
 
+  // Check if user already reviewed a job
+  app.get("/api/jobs/:jobId/my-review", isAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const user = req.user as User;
+      const review = await storage.getReviewByJobAndReviewer(req.params.jobId, user.id);
+      res.json({ review: review || null, hasReviewed: !!review });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to check review status" });
+    }
+  });
+
+  // Get all reviews for a job
+  app.get("/api/jobs/:jobId/reviews", async (req: Request, res: Response) => {
+    try {
+      const reviews = await storage.getReviewsByJob(req.params.jobId);
+      res.json(reviews);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch job reviews" });
+    }
+  });
+
   // ==================== Dispute Routes ====================
   
   // Create dispute

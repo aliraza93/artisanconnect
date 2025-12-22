@@ -93,6 +93,8 @@ export interface IStorage {
   // Reviews
   createReview(review: InsertReview): Promise<Review>;
   getReviewsByReviewee(revieweeId: string): Promise<Review[]>;
+  getReviewByJobAndReviewer(jobId: string, reviewerId: string): Promise<Review | undefined>;
+  getReviewsByJob(jobId: string): Promise<Review[]>;
 
   // Disputes
   createDispute(dispute: InsertDispute): Promise<Dispute>;
@@ -307,6 +309,17 @@ export class DatabaseStorage implements IStorage {
 
   async getReviewsByReviewee(revieweeId: string): Promise<Review[]> {
     return db.select().from(reviews).where(eq(reviews.revieweeId, revieweeId)).orderBy(desc(reviews.createdAt));
+  }
+
+  async getReviewByJobAndReviewer(jobId: string, reviewerId: string): Promise<Review | undefined> {
+    const [review] = await db.select().from(reviews).where(
+      and(eq(reviews.jobId, jobId), eq(reviews.reviewerId, reviewerId))
+    );
+    return review || undefined;
+  }
+
+  async getReviewsByJob(jobId: string): Promise<Review[]> {
+    return db.select().from(reviews).where(eq(reviews.jobId, jobId)).orderBy(desc(reviews.createdAt));
   }
 
   // Disputes

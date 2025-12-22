@@ -21,6 +21,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { MapView } from "@/components/maps/map-view";
+import { ReviewDialog, StarRating } from "@/components/review-dialog";
 
 export default function Dashboard() {
   const { user, loading: authLoading, refreshUser } = useAuth();
@@ -901,22 +902,42 @@ export default function Dashboard() {
                               No completed jobs yet.
                             </div>
                           ) : (
-                            completedJobs.map((job) => (
-                              <div 
-                                key={job.id} 
-                                className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-xl gap-4 opacity-75"
-                              >
-                                <div className="space-y-1">
-                                  <div className="flex items-center gap-2">
-                                    <Badge variant="outline" className="bg-green-50 text-green-700 border-green-100">
-                                      Completed
-                                    </Badge>
-                                    <span className="text-xs text-slate-400">{formatDate(job.createdAt)}</span>
+                            completedJobs.map((job) => {
+                              const jobQuotes = quotes[job.id] || [];
+                              const acceptedQuote = jobQuotes.find(q => q.status === 'accepted');
+                              
+                              return (
+                                <div 
+                                  key={job.id} 
+                                  className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-xl gap-4"
+                                  data-testid={`completed-job-${job.id}`}
+                                >
+                                  <div className="space-y-1 flex-1">
+                                    <div className="flex items-center gap-2">
+                                      <Badge variant="outline" className="bg-green-50 text-green-700 border-green-100">
+                                        Completed
+                                      </Badge>
+                                      <span className="text-xs text-slate-400">{formatDate(job.createdAt)}</span>
+                                    </div>
+                                    <h3 className="font-bold text-slate-900">{job.title}</h3>
+                                    {acceptedQuote && (
+                                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                        <span>Completed by: <span className="font-medium text-foreground">{(acceptedQuote as any).artisanName || 'Artisan'}</span></span>
+                                      </div>
+                                    )}
                                   </div>
-                                  <h3 className="font-bold text-slate-900">{job.title}</h3>
+                                  {user?.role === 'client' && acceptedQuote && (
+                                    <div className="flex items-center gap-2">
+                                      <ReviewDialog
+                                        job={job}
+                                        artisanId={acceptedQuote.artisanId}
+                                        artisanName={(acceptedQuote as any).artisanName || 'Artisan'}
+                                      />
+                                    </div>
+                                  )}
                                 </div>
-                              </div>
-                            ))
+                              );
+                            })
                           )}
                         </TabsContent>
                       </Tabs>

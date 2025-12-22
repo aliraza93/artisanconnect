@@ -404,6 +404,14 @@ class ApiClient {
     return this.request<Review[]>(`/users/${userId}/reviews`);
   }
 
+  async checkMyReview(jobId: string): Promise<{ review: Review | null; hasReviewed: boolean }> {
+    return this.request<{ review: Review | null; hasReviewed: boolean }>(`/jobs/${jobId}/my-review`);
+  }
+
+  async getJobReviews(jobId: string): Promise<Review[]> {
+    return this.request<Review[]>(`/jobs/${jobId}/reviews`);
+  }
+
   // Disputes
   async createDispute(data: {
     jobId: string;
