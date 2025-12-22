@@ -21,7 +21,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { MapView } from "@/components/maps/map-view";
-import { ReviewDialog, StarRating } from "@/components/review-dialog";
+import { ReviewDialog, StarRating, ArtisanReviewsList } from "@/components/review-dialog";
 import { useSEO } from "@/hooks/use-seo";
 
 export default function Dashboard() {
@@ -1080,6 +1080,29 @@ export default function Dashboard() {
                       )}
                     </CardContent>
                   </Card>
+
+                  {/* Review History Card (Artisan Only) */}
+                  {user.role === 'artisan' && user.id && (
+                    <Card className="border-none shadow-sm">
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <Star className="w-5 h-5" />
+                          My Reviews
+                        </CardTitle>
+                        <CardDescription>
+                          See what clients are saying about your work
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <ArtisanReviewsList 
+                          artisanId={user.id}
+                          artisanName={user.fullName}
+                          showTitle={false}
+                          maxReviews={5}
+                        />
+                      </CardContent>
+                    </Card>
+                  )}
                 </div>
               </div>
             </TabsContent>
@@ -1393,6 +1416,16 @@ export default function Dashboard() {
                                 "{quote.message}"
                               </div>
                             )}
+
+                            {/* Review History */}
+                            <div className="pt-2 border-t">
+                              <ArtisanReviewsList 
+                                artisanId={quote.artisanId}
+                                artisanName={quote.artisanName || 'Artisan'}
+                                showTitle={false}
+                                maxReviews={3}
+                              />
+                            </div>
 
                             {user?.role === 'client' && quote.status === 'pending' && (
                               <div className="flex gap-2 pt-2">
