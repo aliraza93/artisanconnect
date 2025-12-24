@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { MapPin, Star, AlertCircle, Plus, Briefcase, Clock, CheckCircle, DollarSign, CreditCard, Building, Mail, X } from "lucide-react";
+import { MapPin, Star, AlertCircle, Plus, Briefcase, Clock, CheckCircle, Receipt, CreditCard, Building, Mail, X } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ChatInterface } from "@/components/chat/chat-interface";
 import { useAuth } from "@/lib/auth-context";
@@ -1040,7 +1040,7 @@ export default function Dashboard() {
                                 {quote.billingType === 'hourly' ? (
                                   <><Clock className="w-3 h-3 mr-1" /> Hourly Rate</>
                                 ) : (
-                                  <><DollarSign className="w-3 h-3 mr-1" /> Fixed Price</>
+                                  <><Receipt className="w-3 h-3 mr-1" /> Fixed Price</>
                                 )}
                               </Badge>
                             </div>
@@ -1405,7 +1405,7 @@ export default function Dashboard() {
                                   {quote.billingType === 'hourly' ? (
                                     <><Clock className="w-3 h-3 mr-1" /> Hourly</>
                                   ) : (
-                                    <><DollarSign className="w-3 h-3 mr-1" /> Fixed</>
+                                    <><Receipt className="w-3 h-3 mr-1" /> Fixed</>
                                   )}
                                 </Badge>
                               </div>
