@@ -56,7 +56,7 @@ async function resetDatabase() {
     for (const tableName of tableNames) {
       try {
         await client.query(`DROP TABLE IF EXISTS "${tableName}" CASCADE`);
-        console.log(`   ✅ Dropped table: ${tableName}`);
+        console.log(`   Dropped table: ${tableName}`);
       } catch (error: any) {
         console.log(`   ⚠️  Error dropping ${tableName}: ${error.message}`);
       }
@@ -75,7 +75,7 @@ async function resetDatabase() {
     for (const enumName of enumNames) {
       try {
         await client.query(`DROP TYPE IF EXISTS "${enumName}" CASCADE`);
-        console.log(`   ✅ Dropped enum: ${enumName}`);
+        console.log(`   Dropped enum: ${enumName}`);
       } catch (error: any) {
         console.log(`   ⚠️  Error dropping ${enumName}: ${error.message}`);
       }
@@ -93,7 +93,7 @@ async function resetDatabase() {
           CONSTRAINT session_pkey PRIMARY KEY (sid)
         )
       `);
-      console.log('   ✅ Session table created');
+      console.log('   Session table created');
     } catch (error: any) {
       console.log(`   ⚠️  Error creating session table: ${error.message}`);
     }
@@ -103,12 +103,12 @@ async function resetDatabase() {
       await client.query(`
         CREATE INDEX IF NOT EXISTS IDX_session_expire ON session (expire)
       `);
-      console.log('   ✅ Index created');
+      console.log('   Index created');
     } catch (error: any) {
       console.log(`   ⚠️  Error creating index: ${error.message}`);
     }
 
-    console.log('\n✅ Database reset completed!');
+    console.log('\nDatabase reset completed!');
     console.log('\n📝 Next steps:');
     console.log('   1. Run: npm run db:push');
     console.log('   2. This will create all tables from the schema');
