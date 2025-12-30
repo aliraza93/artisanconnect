@@ -12,7 +12,8 @@
     "db:push": "drizzle-kit push",
     "db:reset": "tsx script/reset-db.ts",
     "migrate:manual": "tsx script/manual-migration.ts",
-    "migrate": "tsx script/run-migrations.ts"
+    "migrate": "tsx script/run-migrations.ts",
+    "create-session-table": "tsx script/create-session-table.ts"
   },
   "dependencies": {
     "@google-cloud/storage": "^7.18.0",
