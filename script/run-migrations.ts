@@ -4,6 +4,8 @@ import { runMigrations as runStripeMigrations } from 'stripe-replit-sync';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { execSync } from 'child_process';
+import * as schema from '../shared/schema.js';
 
 // Load .env file if it exists (for local development)
 try {
@@ -38,6 +40,27 @@ async function runMigrations() {
   const client = await pool.connect();
   try {
     console.log('🔄 Starting database migrations...\n');
+
+    // Push Drizzle schema to create all main application tables
+    try {
+      console.log('📦 Pushing Drizzle schema to database...');
+      console.log('   This will create: users, jobs, quotes, payments, messages, reviews, disputes, and other tables...');
+      
+      // Use drizzle-kit push to sync schema
+      execSync('npx drizzle-kit push', {
+        stdio: 'inherit',
+        env: {
+          ...process.env,
+          DATABASE_URL: process.env.DATABASE_URL!,
+        },
+        cwd: join(dirname(fileURLToPath(import.meta.url)), '..'),
+      });
+      console.log('✅ Drizzle schema pushed successfully\n');
+    } catch (error: any) {
+      console.error('⚠️  Drizzle push error:', error.message);
+      // Try to continue - tables might already exist
+      console.log('ℹ️  Continuing with other migrations...\n');
+    }
 
     // Run Stripe migrations (required for Stripe functionality)
     try {
