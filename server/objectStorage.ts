@@ -251,7 +251,8 @@ export class ObjectStorageService {
     const privateObjectDir = this.getPrivateObjectDir();
 
     const objectId = randomUUID();
-    const key = `${privateObjectDir}/uploads/${objectId}`;
+    // Use privateObjectDir directly, don't add /uploads/ again
+    const key = `${privateObjectDir}/${objectId}`;
 
     const command = new PutObjectCommand({
       Bucket: bucket,
@@ -264,7 +265,7 @@ export class ObjectStorageService {
 
     return {
       uploadURL,
-      objectPath: `/objects/uploads/${objectId}`,
+      objectPath: `/objects/${objectId}`,
     };
   }
 
@@ -292,8 +293,10 @@ export class ObjectStorageService {
       throw new ObjectNotFoundError();
     }
 
+    // Remove "objects" prefix, get the rest as entityId
     const entityId = parts.slice(1).join("/");
     const privateObjectDir = this.getPrivateObjectDir();
+    // Construct key: privateObjectDir/entityId (no extra /uploads/)
     const key = `${privateObjectDir}/${entityId}`;
     const bucket = this.getBucketName();
 
