@@ -1,4 +1,6 @@
 import { File } from "@google-cloud/storage";
+import { S3Client, PutObjectCommand, HeadObjectCommand, CopyObjectCommand } from "@aws-sdk/client-s3";
+import { s3Client, S3File } from "./objectStorage";
 
 const ACL_POLICY_METADATA_KEY = "custom:aclPolicy";
 
@@ -90,6 +92,95 @@ export async function canAccessObject({
   requestedPermission: ObjectPermission;
 }): Promise<boolean> {
   const aclPolicy = await getObjectAclPolicy(objectFile);
+  if (!aclPolicy) {
+    return false;
+  }
+
+  if (
+    aclPolicy.visibility === "public" &&
+    requestedPermission === ObjectPermission.READ
+  ) {
+    return true;
+  }
+
+  if (!userId) {
+    return false;
+  }
+
+  if (aclPolicy.owner === userId) {
+    return true;
+  }
+
+  for (const rule of aclPolicy.aclRules || []) {
+    const accessGroup = createObjectAccessGroup(rule.group);
+    if (
+      (await accessGroup.hasMember(userId)) &&
+      isPermissionAllowed(requestedPermission, rule.permission)
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+// S3-compatible ACL functions
+export async function setObjectAclPolicyS3(
+  objectFile: S3File,
+  aclPolicy: ObjectAclPolicy,
+): Promise<void> {
+  const exists = await objectFile.exists();
+  if (!exists) {
+    throw new Error(`Object not found: ${objectFile.key}`);
+  }
+
+  // Get current metadata
+  const currentMetadata = await objectFile.getMetadata();
+  
+  // Update metadata with ACL policy
+  const updatedMetadata = {
+    ...(currentMetadata.metadata || {}),
+    [ACL_POLICY_METADATA_KEY]: JSON.stringify(aclPolicy),
+  };
+
+  // Copy object to itself with updated metadata
+  const copyCommand = new CopyObjectCommand({
+    Bucket: objectFile.bucket,
+    CopySource: `${objectFile.bucket}/${objectFile.key}`,
+    Key: objectFile.key,
+    Metadata: updatedMetadata,
+    MetadataDirective: "REPLACE",
+  });
+
+  await s3Client.send(copyCommand);
+}
+
+export async function getObjectAclPolicyS3(
+  objectFile: S3File,
+): Promise<ObjectAclPolicy | null> {
+  const metadata = await objectFile.getMetadata();
+  const aclPolicy = metadata?.metadata?.[ACL_POLICY_METADATA_KEY];
+  if (!aclPolicy) {
+    return null;
+  }
+  try {
+    return JSON.parse(aclPolicy);
+  } catch (error) {
+    console.error("Error parsing ACL policy:", error);
+    return null;
+  }
+}
+
+export async function canAccessObjectS3({
+  userId,
+  objectFile,
+  requestedPermission,
+}: {
+  userId?: string;
+  objectFile: S3File;
+  requestedPermission: ObjectPermission;
+}): Promise<boolean> {
+  const aclPolicy = await getObjectAclPolicyS3(objectFile);
   if (!aclPolicy) {
     return false;
   }

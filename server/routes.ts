@@ -1446,8 +1446,10 @@ export async function registerRoutes(
         return res.status(400).json({ error: "imageURL is required" });
       }
 
-      // Validate image path is from our object storage (either full GCS URL or object path)
-      const isValidPath = imageURL.startsWith('/objects/') || imageURL.startsWith('https://storage.googleapis.com/');
+      // Validate image path is from our object storage (S3 URL, GCS URL, or object path)
+      const isValidPath = imageURL.startsWith('/objects/') || 
+                          imageURL.startsWith('https://storage.googleapis.com/') ||
+                          (imageURL.startsWith('https://') && imageURL.includes('.s3.'));
       if (!isValidPath) {
         return res.status(400).json({ error: "Invalid image path - must be from our storage" });
       }
