@@ -44,6 +44,7 @@ export interface Job {
   budget: string | null;
   status: 'open' | 'quoted' | 'in_progress' | 'completed' | 'cancelled' | 'disputed';
   needsLogistics: boolean;
+  images: string[] | null;
   createdAt: string;
   updatedAt: string;
 }

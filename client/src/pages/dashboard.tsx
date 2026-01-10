@@ -39,6 +39,7 @@ export default function Dashboard() {
   const [payments, setPayments] = useState<{[jobId: string]: Payment[]}>({});
   const [loading, setLoading] = useState(true);
   const [selectedJobForQuotes, setSelectedJobForQuotes] = useState<string | null>(null);
+  const [selectedJobForDetails, setSelectedJobForDetails] = useState<string | null>(null);
   
   // Quote submission modal state
   const [showQuoteModal, setShowQuoteModal] = useState(false);
@@ -413,6 +414,23 @@ export default function Dashboard() {
   const formatCurrency = (amount: string | number) => {
     const num = typeof amount === 'string' ? parseFloat(amount) : amount;
     return `R ${num.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  };
+
+  const getImageUrl = (imagePath: string) => {
+    // If path already starts with /api, use as is
+    if (imagePath.startsWith('/api/')) {
+      return imagePath;
+    }
+    // If path starts with /objects, prefix with /api
+    if (imagePath.startsWith('/objects/')) {
+      return `/api${imagePath}`;
+    }
+    // If path starts with /, assume it's an API path
+    if (imagePath.startsWith('/')) {
+      return `/api${imagePath}`;
+    }
+    // Otherwise, assume it's a full URL or relative path
+    return imagePath;
   };
 
   const calculateEstimatedTotal = () => {
@@ -840,23 +858,38 @@ export default function Dashboard() {
                           ) : (
                             activeJobs.map((job) => {
                               const hasQuoted = user.role === 'artisan' && quotes[job.id]?.some(q => q.artisanId === user.id);
+                              const firstImage = job.images && job.images.length > 0 ? job.images[0] : null;
                               return (
                                 <div 
                                   key={job.id} 
                                   className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-xl hover:bg-slate-50 transition-colors gap-4"
                                   data-testid={`job-card-${job.id}`}
                                 >
-                                  <div className="space-y-1">
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                      <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-100">
-                                        {job.category}
-                                      </Badge>
-                                      {getStatusBadge(job.status)}
-                                      <span className="text-xs text-slate-400">{formatDate(job.createdAt)}</span>
-                                    </div>
-                                    <h3 className="font-bold text-slate-900">{job.title}</h3>
-                                    <div className="flex items-center gap-2 text-sm text-slate-500">
-                                      <MapPin className="w-4 h-4" /> {job.location}
+                                  <div className="flex gap-4 flex-1">
+                                    {firstImage && (
+                                      <div className="w-24 h-24 flex-shrink-0 rounded-lg overflow-hidden border">
+                                        <img 
+                                          src={getImageUrl(firstImage)}
+                                          alt={job.title}
+                                          className="w-full h-full object-cover"
+                                        />
+                                      </div>
+                                    )}
+                                    <div className="space-y-1 flex-1">
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-100">
+                                          {job.category}
+                                        </Badge>
+                                        {getStatusBadge(job.status)}
+                                        <span className="text-xs text-slate-400">{formatDate(job.createdAt)}</span>
+                                      </div>
+                                      <h3 className="font-bold text-slate-900">{job.title}</h3>
+                                      <div className="flex items-center gap-2 text-sm text-slate-500">
+                                        <MapPin className="w-4 h-4" /> {job.location}
+                                      </div>
+                                      {user.role === 'artisan' && (
+                                        <p className="text-sm text-slate-600 line-clamp-2">{job.description}</p>
+                                      )}
                                     </div>
                                   </div>
                                   <div className="flex items-center gap-4">
@@ -875,14 +908,26 @@ export default function Dashboard() {
                                         </Badge>
                                       )}
                                     </div>
-                                    {user.role === 'artisan' && !hasQuoted && job.status === 'open' && (
-                                      <Button 
-                                        onClick={() => openQuoteModal(job)}
-                                        className="bg-secondary hover:bg-secondary/90"
-                                        data-testid={`button-submit-quote-${job.id}`}
-                                      >
-                                        Submit Quote
-                                      </Button>
+                                    {user.role === 'artisan' && (
+                                      <div className="flex gap-2">
+                                        <Button 
+                                          variant="outline" 
+                                          size="sm"
+                                          onClick={() => setSelectedJobForDetails(job.id)}
+                                          data-testid={`button-view-job-details-${job.id}`}
+                                        >
+                                          View Details
+                                        </Button>
+                                        {!hasQuoted && job.status === 'open' && (
+                                          <Button 
+                                            onClick={() => openQuoteModal(job)}
+                                            className="bg-secondary hover:bg-secondary/90"
+                                            data-testid={`button-submit-quote-${job.id}`}
+                                          >
+                                            Submit Quote
+                                          </Button>
+                                        )}
+                                      </div>
                                     )}
                                     {user.role === 'client' && (
                                       <Button 
@@ -1313,6 +1358,23 @@ export default function Dashboard() {
                     )}
                   </div>
                   
+                  {job.images && job.images.length > 0 && (
+                    <div>
+                      <h4 className="font-medium mb-2">Images</h4>
+                      <div className="grid grid-cols-2 gap-4">
+                        {job.images.map((image, index) => (
+                          <div key={index} className="rounded-lg overflow-hidden border">
+                            <img 
+                              src={getImageUrl(image)}
+                              alt={`${job.title} - Image ${index + 1}`}
+                              className="w-full h-48 object-cover"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
                   <div>
                     <h4 className="font-medium mb-2">Description</h4>
                     <p className="text-sm text-slate-600">{job.description}</p>
@@ -1461,6 +1523,108 @@ export default function Dashboard() {
                   <Button variant="outline" onClick={() => setSelectedJobForQuotes(null)}>
                     Close
                   </Button>
+                </DialogFooter>
+              </>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
+
+      {/* Job Details Modal for Artisans */}
+      <Dialog open={!!selectedJobForDetails} onOpenChange={(open) => !open && setSelectedJobForDetails(null)}>
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+          {selectedJobForDetails && (() => {
+            const job = jobs.find(j => j.id === selectedJobForDetails);
+            if (!job) return null;
+            
+            return (
+              <>
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <Briefcase className="w-5 h-5" />
+                    {job.title}
+                  </DialogTitle>
+                  <DialogDescription>
+                    View full job details
+                  </DialogDescription>
+                </DialogHeader>
+                
+                <div className="space-y-6 py-4">
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-slate-500">Category:</span>
+                      <Badge variant="outline" className="ml-2 bg-blue-50 text-blue-700 border-blue-100">
+                        {job.category}
+                      </Badge>
+                    </div>
+                    <div>
+                      <span className="text-slate-500">Status:</span>
+                      <span className="ml-2">{getStatusBadge(job.status)}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <MapPin className="w-4 h-4 text-slate-400" />
+                      <span>{job.location}</span>
+                    </div>
+                    {job.budget && (
+                      <div>
+                        <span className="text-slate-500">Budget:</span>
+                        <span className="ml-2 font-medium">R {job.budget}</span>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {job.images && job.images.length > 0 && (
+                    <div>
+                      <h4 className="font-medium mb-2">Images</h4>
+                      <div className="grid grid-cols-2 gap-4">
+                        {job.images.map((image, index) => (
+                          <div key={index} className="rounded-lg overflow-hidden border">
+                            <img 
+                              src={getImageUrl(image)}
+                              alt={`${job.title} - Image ${index + 1}`}
+                              className="w-full h-48 object-cover"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div>
+                    <h4 className="font-medium mb-2">Description</h4>
+                    <p className="text-sm text-slate-600 whitespace-pre-wrap">{job.description}</p>
+                  </div>
+                  
+                  {job.address && job.latitude && job.longitude && (
+                    <div>
+                      <h4 className="font-medium mb-2">Location</h4>
+                      <p className="text-sm text-slate-600 mb-3">{job.address}</p>
+                      <MapView
+                        latitude={parseFloat(job.latitude)}
+                        longitude={parseFloat(job.longitude)}
+                        address={job.address}
+                        height="300px"
+                        markerTitle={job.title}
+                      />
+                    </div>
+                  )}
+                </div>
+                
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setSelectedJobForDetails(null)}>
+                    Close
+                  </Button>
+                  {job.status === 'open' && !quotes[job.id]?.some(q => q.artisanId === user?.id) && (
+                    <Button 
+                      onClick={() => {
+                        setSelectedJobForDetails(null);
+                        openQuoteModal(job);
+                      }}
+                      className="bg-secondary hover:bg-secondary/90"
+                    >
+                      Submit Quote
+                    </Button>
+                  )}
                 </DialogFooter>
               </>
             );
