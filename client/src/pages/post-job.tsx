@@ -77,17 +77,6 @@ export default function PostJob() {
     setIsSubmitting(true);
     
     try {
-      // Normalize image URLs before creating job
-      const normalizedImages = uploadedImages.map(img => {
-        // Ensure images are in the correct format
-        if (img.startsWith('/objects/')) {
-          return img;
-        }
-        // If it's already a full path, use it
-        return img;
-      });
-
-      // Create job with images included
       const job = await api.createJob({
         title: formData.title,
         description: formData.description,
@@ -98,40 +87,19 @@ export default function PostJob() {
         longitude: formData.longitude !== null ? String(formData.longitude) : undefined,
         budget: formData.budget || undefined,
         needsLogistics: formData.needsLogistics,
-        images: normalizedImages.length > 0 ? normalizedImages : undefined,
       });
 
-      // If images weren't included in creation (fallback), add them via PUT requests
-      if (normalizedImages.length > 0 && (!job.images || job.images.length === 0)) {
-        console.log('Adding images via PUT requests as fallback...');
-        const imagePromises = normalizedImages.map(async (imageURL) => {
-          try {
-            const response = await fetch(`/api/jobs/${job.id}/images`, {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              credentials: 'include',
-              body: JSON.stringify({ imageURL }),
-            });
-            
-            if (!response.ok) {
-              const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-              console.error('Failed to add image to job:', errorData.error || response.statusText);
-              throw new Error(errorData.error || 'Failed to add image');
-            }
-            return await response.json();
-          } catch (imgError: any) {
-            console.error('Failed to add image to job:', imgError);
-            throw imgError;
-          }
-        });
-
-        // Wait for all images to be added
+      // Add uploaded images to the job
+      for (const imageURL of uploadedImages) {
         try {
-          await Promise.all(imagePromises);
-          console.log('All images added successfully');
-        } catch (error) {
-          console.error('Some images failed to upload, but job was created');
-          // Don't fail the entire operation if images fail
+          await fetch(`/api/jobs/${job.id}/images`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ imageURL }),
+          });
+        } catch (imgError) {
+          console.error('Failed to add image to job:', imgError);
         }
       }
 

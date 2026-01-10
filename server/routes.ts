@@ -504,35 +504,13 @@ export async function registerRoutes(
     try {
       const user = req.user as User;
       console.log('Creating job for user:', user.id, 'with data:', req.body);
-      
-      // Process images if provided
-      let processedImages: string[] | undefined = undefined;
-      if (req.body.images && Array.isArray(req.body.images) && req.body.images.length > 0) {
-        // If images are already full URLs, use them directly
-        // Otherwise, normalize them (for backward compatibility)
-        const { ObjectStorageService } = await import('./objectStorage');
-        const objectStorageService = new ObjectStorageService();
-        
-        processedImages = req.body.images.map((img: string) => {
-          // If it's already a full URL, keep it as is
-          if (img.startsWith('http://') || img.startsWith('https://')) {
-            return img;
-          }
-          // Otherwise, normalize the path (for backward compatibility with old data)
-          return objectStorageService.normalizeObjectEntityPath(img);
-        });
-        
-        console.log('Processing images for job creation:', processedImages);
-      }
-      
       const validatedData = insertJobSchema.parse({
         ...req.body,
         clientId: user.id,
-        images: processedImages || req.body.images || [],
       });
       
       const job = await storage.createJob(validatedData);
-      console.log('Job created successfully:', job.id, 'with images:', job.images);
+      console.log('Job created successfully:', job.id);
       res.status(201).json(job);
     } catch (error: any) {
       console.error('Job creation error:', error);
@@ -1435,15 +1413,18 @@ export async function registerRoutes(
         return res.status(500).json({ error: "Failed to generate upload URL" });
       }
       
-      // Construct full URL for the image
-      const protocol = req.protocol; // 'http' or 'https'
-      const host = req.get('host'); // e.g., 'artisanconnect.xyz' or 'localhost:3000'
-      const fullImageURL = `${protocol}://${host}/api${result.objectPath}`;
+      // Generate public S3 URL that will be accessible after upload
+      const bucket = process.env.AWS_S3_BUCKET || '';
+      const region = process.env.AWS_REGION || 'us-east-1';
+      const privateObjectDir = process.env.PRIVATE_OBJECT_DIR || 'uploads';
+      const objectId = result.objectPath.replace('/objects/', '');
+      const s3Key = `${privateObjectDir}/${objectId}`;
+      const publicS3URL = `https://${bucket}.s3.${region}.amazonaws.com/${s3Key}`;
       
       res.json({ 
         uploadURL: result.uploadURL, 
         objectPath: result.objectPath,
-        imageURL: fullImageURL // Return full URL for storage
+        s3URL: publicS3URL // Public S3 URL to store
       });
     } catch (error) {
       console.error("Error getting upload URL:", error);
@@ -1466,6 +1447,35 @@ export async function registerRoutes(
     }
   });
 
+  // Set object ACL to public after upload
+  app.post("/api/objects/set-public", isAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const user = req.user as User;
+      const { objectPath } = req.body;
+      
+      if (!objectPath) {
+        return res.status(400).json({ error: "objectPath is required" });
+      }
+
+      const { ObjectStorageService } = await import('./objectStorage');
+      const objectStorageService = new ObjectStorageService();
+      
+      // Set ACL to public so S3 URL is accessible
+      await objectStorageService.trySetObjectEntityAclPolicy(
+        objectPath,
+        {
+          owner: user.id,
+          visibility: "public",
+        }
+      );
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error setting public ACL:", error);
+      res.status(500).json({ error: "Failed to set public ACL" });
+    }
+  });
+
   // Update job images after upload
   app.put("/api/jobs/:id/images", isAuthenticated, async (req: Request, res: Response) => {
     try {
@@ -1477,13 +1487,25 @@ export async function registerRoutes(
         return res.status(400).json({ error: "imageURL is required" });
       }
 
-      // Validate image path is from our object storage (full URL, S3 URL, GCS URL, or object path)
+      // Validate image path is from our object storage (S3 URL, GCS URL, or object path)
       const isValidPath = imageURL.startsWith('/objects/') || 
                           imageURL.startsWith('https://storage.googleapis.com/') ||
-                          (imageURL.startsWith('https://') && imageURL.includes('.s3.')) ||
-                          (imageURL.startsWith('http://') || imageURL.startsWith('https://')); // Allow full URLs
+                          (imageURL.startsWith('https://') && imageURL.includes('.s3.'));
       if (!isValidPath) {
         return res.status(400).json({ error: "Invalid image path - must be from our storage" });
+      }
+
+      // If it's an S3 URL, extract objectPath for ACL operations
+      let objectPathForACL = imageURL;
+      if (imageURL.includes('.s3.') && imageURL.includes('amazonaws.com/')) {
+        // Extract key from S3 URL: https://bucket.s3.region.amazonaws.com/key
+        const url = new URL(imageURL);
+        const key = url.pathname.substring(1); // Remove leading /
+        const privateObjectDir = process.env.PRIVATE_OBJECT_DIR || 'uploads';
+        if (key.startsWith(`${privateObjectDir}/`)) {
+          const objectId = key.substring(privateObjectDir.length + 1);
+          objectPathForACL = `/objects/${objectId}`;
+        }
       }
 
       const job = await storage.getJob(jobId);
@@ -1499,65 +1521,35 @@ export async function registerRoutes(
       const { ObjectStorageService } = await import('./objectStorage');
       const objectStorageService = new ObjectStorageService();
       
-      // If imageURL is already a full URL, extract the path part for ACL operations
-      // Otherwise, normalize the path and construct full URL
-      let normalizedPath: string;
-      let finalImageURL: string = imageURL; // Store the full URL if provided
-      
-      if (imageURL.startsWith('http://') || imageURL.startsWith('https://')) {
-        // Extract path from full URL (e.g., https://domain.com/api/objects/xxx -> /objects/xxx)
-        const urlObj = new URL(imageURL);
-        normalizedPath = urlObj.pathname.startsWith('/api') 
-          ? urlObj.pathname.substring(4) // Remove /api prefix
-          : urlObj.pathname;
-        // Keep the full URL for storage
-        finalImageURL = imageURL;
-      } else {
-        normalizedPath = objectStorageService.normalizeObjectEntityPath(imageURL);
-        // Construct full URL from path
-        const protocol = req.protocol;
-        const host = req.get('host');
-        finalImageURL = `${protocol}://${host}/api${normalizedPath}`;
-      }
-      
-      // Set ACL policy - public so artisans can view (use normalized path for ACL)
-      let objectPath: string = normalizedPath;
-      try {
-        objectPath = await objectStorageService.trySetObjectEntityAclPolicy(
-          normalizedPath, // Use normalized path for ACL operations
-          {
-            owner: user.id,
-            visibility: "public",
-          }
-        );
-      } catch (aclError: any) {
-        console.error("Error setting ACL policy for image:", aclError);
-        console.error("ACL error details:", {
-          imageURL,
-          normalizedPath,
-          error: aclError.message || aclError.toString(),
-        });
-        // If ACL setting fails, use the normalized path anyway
-        // The image was uploaded successfully, so we should still save the reference
-        console.warn("Using normalized path without ACL update:", normalizedPath);
+      // Set ACL policy - public so artisans can view (if not already an S3 URL)
+      if (!imageURL.includes('.s3.')) {
+        try {
+          await objectStorageService.trySetObjectEntityAclPolicy(
+            objectPathForACL,
+            {
+              owner: user.id,
+              visibility: "public",
+            }
+          );
+        } catch (aclError) {
+          console.warn("Failed to set ACL, but continuing:", aclError);
+        }
       }
 
-      // Add image to job's images array (store full URL for simplicity)
+      // Store the S3 URL directly (or objectPath if it's not an S3 URL yet)
       const currentImages = job.images || [];
-      const updatedImages = [...currentImages, finalImageURL];
+      const updatedImages = [...currentImages, imageURL];
       
       await storage.updateJob(jobId, { images: updatedImages });
 
       res.json({ 
         success: true, 
         objectPath,
-        imageURL: finalImageURL,
         images: updatedImages
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error adding job image:", error);
-      const errorMessage = error?.message || "Failed to add image";
-      res.status(500).json({ error: errorMessage });
+      res.status(500).json({ error: "Failed to add image" });
     }
   });
 

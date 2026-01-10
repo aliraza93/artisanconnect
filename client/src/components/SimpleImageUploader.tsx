@@ -98,13 +98,13 @@ export function SimpleImageUploader({
           }
 
           const data = await response.json();
-          const { uploadURL, objectPath, imageURL } = data;
+          const { uploadURL, objectPath, s3URL } = data;
           
           if (!uploadURL || !objectPath) {
             throw new Error('No upload URL received from server');
           }
 
-          // Upload file to S3 using the uploadURL
+          // Upload file to S3
           const uploadResponse = await fetch(uploadURL, {
             method: 'PUT',
             body: file,
@@ -117,14 +117,25 @@ export function SimpleImageUploader({
             throw new Error('Failed to upload file');
           }
 
-          // Always use the imageURL from the server response (full URL)
-          // This is the complete URL that should be stored and used for display
-          if (!imageURL) {
-            console.warn('No imageURL in response, falling back to constructed path');
+          // Set ACL to public and get S3 URL
+          try {
+            await fetch('/api/objects/set-public', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ objectPath }),
+            });
+          } catch (aclError) {
+            console.warn('Failed to set public ACL:', aclError);
           }
-          const finalImageURL = imageURL || `/api${objectPath}`;
-          console.log('Storing image URL:', finalImageURL);
-          uploadedURLs.push(finalImageURL);
+
+          // Store the S3 URL returned from server
+          if (s3URL) {
+            uploadedURLs.push(s3URL);
+          } else {
+            // Fallback to objectPath if s3URL not provided
+            uploadedURLs.push(objectPath);
+          }
         } catch (error) {
           console.error('Error uploading file:', error);
           const errorMessage = error instanceof Error ? error.message : 'Unknown error';

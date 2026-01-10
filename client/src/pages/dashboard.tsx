@@ -40,7 +40,6 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [selectedJobForQuotes, setSelectedJobForQuotes] = useState<string | null>(null);
   const [selectedJobForDetails, setSelectedJobForDetails] = useState<string | null>(null);
-  const [selectedJobData, setSelectedJobData] = useState<Job | null>(null);
   
   // Quote submission modal state
   const [showQuoteModal, setShowQuoteModal] = useState(false);
@@ -415,27 +414,6 @@ export default function Dashboard() {
   const formatCurrency = (amount: string | number) => {
     const num = typeof amount === 'string' ? parseFloat(amount) : amount;
     return `R ${num.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  };
-
-  const getImageUrl = (imagePath: string) => {
-    // If it's already a full URL (starts with http:// or https://), use it directly
-    if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
-      return imagePath;
-    }
-    // If path already starts with /api, use as is
-    if (imagePath.startsWith('/api/')) {
-      return imagePath;
-    }
-    // If path starts with /objects, prefix with /api
-    if (imagePath.startsWith('/objects/')) {
-      return `/api${imagePath}`;
-    }
-    // If path starts with /, assume it's an API path
-    if (imagePath.startsWith('/')) {
-      return `/api${imagePath}`;
-    }
-    // Otherwise, assume it's a full URL or relative path
-    return imagePath;
   };
 
   const calculateEstimatedTotal = () => {
@@ -874,9 +852,12 @@ export default function Dashboard() {
                                     {firstImage && (
                                       <div className="w-24 h-24 flex-shrink-0 rounded-lg overflow-hidden border">
                                         <img 
-                                          src={getImageUrl(firstImage)}
+                                          src={firstImage}
                                           alt={job.title}
                                           className="w-full h-full object-cover"
+                                          onError={(e) => {
+                                            (e.target as HTMLImageElement).style.display = 'none';
+                                          }}
                                         />
                                       </div>
                                     )}
@@ -918,17 +899,7 @@ export default function Dashboard() {
                                         <Button 
                                           variant="outline" 
                                           size="sm"
-                                          onClick={async () => {
-                                            setSelectedJobForDetails(job.id);
-                                            // Fetch fresh job data to ensure images are up to date
-                                            try {
-                                              const freshJob = await api.getJob(job.id);
-                                              setSelectedJobData(freshJob);
-                                            } catch (error) {
-                                              console.error('Failed to fetch fresh job data:', error);
-                                              setSelectedJobData(job);
-                                            }
-                                          }}
+                                          onClick={() => setSelectedJobForDetails(job.id)}
                                           data-testid={`button-view-job-details-${job.id}`}
                                         >
                                           View Details
@@ -948,17 +919,7 @@ export default function Dashboard() {
                                       <Button 
                                         variant="outline" 
                                         size="sm"
-                                        onClick={async () => {
-                                          setSelectedJobForQuotes(job.id);
-                                          // Fetch fresh job data to ensure images are up to date
-                                          try {
-                                            const freshJob = await api.getJob(job.id);
-                                            setSelectedJobData(freshJob);
-                                          } catch (error) {
-                                            console.error('Failed to fetch fresh job data:', error);
-                                            setSelectedJobData(job);
-                                          }
-                                        }}
+                                        onClick={() => setSelectedJobForQuotes(job.id)}
                                         data-testid={`button-view-job-${job.id}`}
                                       >
                                         View
@@ -1340,22 +1301,12 @@ export default function Dashboard() {
       </div>
 
       {/* Job Details Modal (for viewing quotes with artisan info) */}
-      <Dialog open={!!selectedJobForQuotes} onOpenChange={(open) => {
-        if (!open) {
-          setSelectedJobForQuotes(null);
-          setSelectedJobData(null);
-        }
-      }}>
+      <Dialog open={!!selectedJobForQuotes} onOpenChange={(open) => !open && setSelectedJobForQuotes(null)}>
         <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           {selectedJobForQuotes && (() => {
-            // Use fresh job data if available, otherwise use cached job
-            const cachedJob = jobs.find(j => j.id === selectedJobForQuotes);
-            const job = selectedJobData && selectedJobData.id === selectedJobForQuotes ? selectedJobData : cachedJob;
+            const job = jobs.find(j => j.id === selectedJobForQuotes);
             const jobQuotes = quotes[selectedJobForQuotes] || [];
             if (!job) return null;
-            
-            // Debug
-            console.log('Job images:', job.images, 'Job ID:', job.id);
             
             return (
               <>
@@ -1402,7 +1353,7 @@ export default function Dashboard() {
                           return (
                             <div key={index} className="rounded-lg overflow-hidden border">
                               <img 
-                                src={getImageUrl(image)}
+                                src={image}
                                 alt={`${job.title} - Image ${index + 1}`}
                                 className="w-full h-48 object-cover"
                                 onError={(e) => {
@@ -1419,7 +1370,7 @@ export default function Dashboard() {
                   
                   <div>
                     <h4 className="font-medium mb-2">Description</h4>
-                    <p className="text-sm text-slate-600">{job.description}</p>
+                    <p className="text-sm text-slate-600 whitespace-pre-wrap">{job.description}</p>
                   </div>
                   
                   {job.address && job.latitude && job.longitude && (
@@ -1573,21 +1524,11 @@ export default function Dashboard() {
       </Dialog>
 
       {/* Job Details Modal for Artisans */}
-      <Dialog open={!!selectedJobForDetails} onOpenChange={(open) => {
-        if (!open) {
-          setSelectedJobForDetails(null);
-          setSelectedJobData(null);
-        }
-      }}>
+      <Dialog open={!!selectedJobForDetails} onOpenChange={(open) => !open && setSelectedJobForDetails(null)}>
         <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           {selectedJobForDetails && (() => {
-            // Use fresh job data if available, otherwise use cached job
-            const cachedJob = jobs.find(j => j.id === selectedJobForDetails);
-            const job = selectedJobData && selectedJobData.id === selectedJobForDetails ? selectedJobData : cachedJob;
+            const job = jobs.find(j => j.id === selectedJobForDetails);
             if (!job) return null;
-            
-            // Debug
-            console.log('Job images (artisan view):', job.images, 'Job ID:', job.id);
             
             return (
               <>
@@ -1625,19 +1566,26 @@ export default function Dashboard() {
                     )}
                   </div>
                   
-                  {job.images && job.images.length > 0 && (
+                  {job.images && Array.isArray(job.images) && job.images.length > 0 && (
                     <div>
-                      <h4 className="font-medium mb-2">Images</h4>
+                      <h4 className="font-medium mb-2">Images ({job.images.length})</h4>
                       <div className="grid grid-cols-2 gap-4">
-                        {job.images.map((image, index) => (
-                          <div key={index} className="rounded-lg overflow-hidden border">
-                            <img 
-                              src={getImageUrl(image)}
-                              alt={`${job.title} - Image ${index + 1}`}
-                              className="w-full h-48 object-cover"
-                            />
-                          </div>
-                        ))}
+                        {job.images.map((image, index) => {
+                          if (!image) return null;
+                          return (
+                            <div key={index} className="rounded-lg overflow-hidden border">
+                              <img 
+                                src={image}
+                                alt={`${job.title} - Image ${index + 1}`}
+                                className="w-full h-48 object-cover"
+                                onError={(e) => {
+                                  console.error('Failed to load image:', image);
+                                  (e.target as HTMLImageElement).style.display = 'none';
+                                }}
+                              />
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
