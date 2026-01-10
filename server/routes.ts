@@ -510,14 +510,15 @@ export async function registerRoutes(
       if (req.body.images && Array.isArray(req.body.images) && req.body.images.length > 0) {
         // If images are already full URLs, use them directly
         // Otherwise, normalize them (for backward compatibility)
+        const { ObjectStorageService } = await import('./objectStorage');
+        const objectStorageService = new ObjectStorageService();
+        
         processedImages = req.body.images.map((img: string) => {
           // If it's already a full URL, keep it as is
           if (img.startsWith('http://') || img.startsWith('https://')) {
             return img;
           }
           // Otherwise, normalize the path (for backward compatibility with old data)
-          const { ObjectStorageService } = await import('./objectStorage');
-          const objectStorageService = new ObjectStorageService();
           return objectStorageService.normalizeObjectEntityPath(img);
         });
         
