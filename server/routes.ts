@@ -508,11 +508,16 @@ export async function registerRoutes(
       // Process images if provided
       let processedImages: string[] | undefined = undefined;
       if (req.body.images && Array.isArray(req.body.images) && req.body.images.length > 0) {
-        const { ObjectStorageService } = await import('./objectStorage');
-        const objectStorageService = new ObjectStorageService();
-        
-        // Normalize all image paths
+        // If images are already full URLs, use them directly
+        // Otherwise, normalize them (for backward compatibility)
         processedImages = req.body.images.map((img: string) => {
+          // If it's already a full URL, keep it as is
+          if (img.startsWith('http://') || img.startsWith('https://')) {
+            return img;
+          }
+          // Otherwise, normalize the path (for backward compatibility with old data)
+          const { ObjectStorageService } = await import('./objectStorage');
+          const objectStorageService = new ObjectStorageService();
           return objectStorageService.normalizeObjectEntityPath(img);
         });
         
@@ -1429,7 +1434,16 @@ export async function registerRoutes(
         return res.status(500).json({ error: "Failed to generate upload URL" });
       }
       
-      res.json({ uploadURL: result.uploadURL, objectPath: result.objectPath });
+      // Construct full URL for the image
+      const protocol = req.protocol; // 'http' or 'https'
+      const host = req.get('host'); // e.g., 'artisanconnect.xyz' or 'localhost:3000'
+      const fullImageURL = `${protocol}://${host}/api${result.objectPath}`;
+      
+      res.json({ 
+        uploadURL: result.uploadURL, 
+        objectPath: result.objectPath,
+        imageURL: fullImageURL // Return full URL for storage
+      });
     } catch (error) {
       console.error("Error getting upload URL:", error);
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
@@ -1462,10 +1476,11 @@ export async function registerRoutes(
         return res.status(400).json({ error: "imageURL is required" });
       }
 
-      // Validate image path is from our object storage (S3 URL, GCS URL, or object path)
+      // Validate image path is from our object storage (full URL, S3 URL, GCS URL, or object path)
       const isValidPath = imageURL.startsWith('/objects/') || 
                           imageURL.startsWith('https://storage.googleapis.com/') ||
-                          (imageURL.startsWith('https://') && imageURL.includes('.s3.'));
+                          (imageURL.startsWith('https://') && imageURL.includes('.s3.')) ||
+                          (imageURL.startsWith('http://') || imageURL.startsWith('https://')); // Allow full URLs
       if (!isValidPath) {
         return res.status(400).json({ error: "Invalid image path - must be from our storage" });
       }
@@ -1483,14 +1498,32 @@ export async function registerRoutes(
       const { ObjectStorageService } = await import('./objectStorage');
       const objectStorageService = new ObjectStorageService();
       
-      // Normalize the path first
-      const normalizedPath = objectStorageService.normalizeObjectEntityPath(imageURL);
+      // If imageURL is already a full URL, extract the path part for ACL operations
+      // Otherwise, normalize the path and construct full URL
+      let normalizedPath: string;
+      let finalImageURL: string = imageURL; // Store the full URL if provided
       
-      // Set ACL policy - public so artisans can view
+      if (imageURL.startsWith('http://') || imageURL.startsWith('https://')) {
+        // Extract path from full URL (e.g., https://domain.com/api/objects/xxx -> /objects/xxx)
+        const urlObj = new URL(imageURL);
+        normalizedPath = urlObj.pathname.startsWith('/api') 
+          ? urlObj.pathname.substring(4) // Remove /api prefix
+          : urlObj.pathname;
+        // Keep the full URL for storage
+        finalImageURL = imageURL;
+      } else {
+        normalizedPath = objectStorageService.normalizeObjectEntityPath(imageURL);
+        // Construct full URL from path
+        const protocol = req.protocol;
+        const host = req.get('host');
+        finalImageURL = `${protocol}://${host}/api${normalizedPath}`;
+      }
+      
+      // Set ACL policy - public so artisans can view (use normalized path for ACL)
       let objectPath: string = normalizedPath;
       try {
         objectPath = await objectStorageService.trySetObjectEntityAclPolicy(
-          imageURL,
+          normalizedPath, // Use normalized path for ACL operations
           {
             owner: user.id,
             visibility: "public",
@@ -1508,15 +1541,16 @@ export async function registerRoutes(
         console.warn("Using normalized path without ACL update:", normalizedPath);
       }
 
-      // Add image to job's images array
+      // Add image to job's images array (store full URL for simplicity)
       const currentImages = job.images || [];
-      const updatedImages = [...currentImages, objectPath];
+      const updatedImages = [...currentImages, finalImageURL];
       
       await storage.updateJob(jobId, { images: updatedImages });
 
       res.json({ 
         success: true, 
         objectPath,
+        imageURL: finalImageURL,
         images: updatedImages
       });
     } catch (error: any) {

@@ -418,6 +418,10 @@ export default function Dashboard() {
   };
 
   const getImageUrl = (imagePath: string) => {
+    // If it's already a full URL (starts with http:// or https://), use it directly
+    if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+      return imagePath;
+    }
     // If path already starts with /api, use as is
     if (imagePath.startsWith('/api/')) {
       return imagePath;
