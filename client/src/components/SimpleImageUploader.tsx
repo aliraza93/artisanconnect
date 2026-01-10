@@ -104,7 +104,7 @@ export function SimpleImageUploader({
             throw new Error('No upload URL received from server');
           }
 
-          // Upload file to S3
+          // Upload file to S3 using the uploadURL
           const uploadResponse = await fetch(uploadURL, {
             method: 'PUT',
             body: file,
@@ -117,9 +117,13 @@ export function SimpleImageUploader({
             throw new Error('Failed to upload file');
           }
 
-          // Use the full imageURL if provided, otherwise fall back to objectPath
-          // This ensures we store the complete URL for easy access
+          // Always use the imageURL from the server response (full URL)
+          // This is the complete URL that should be stored and used for display
+          if (!imageURL) {
+            console.warn('No imageURL in response, falling back to constructed path');
+          }
           const finalImageURL = imageURL || `/api${objectPath}`;
+          console.log('Storing image URL:', finalImageURL);
           uploadedURLs.push(finalImageURL);
         } catch (error) {
           console.error('Error uploading file:', error);
