@@ -1,5 +1,5 @@
 import { File } from "@google-cloud/storage";
-import { S3Client, PutObjectCommand, HeadObjectCommand, CopyObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, HeadObjectCommand, CopyObjectCommand, PutObjectAclCommand } from "@aws-sdk/client-s3";
 import { s3Client, S3File } from "./objectStorage";
 
 const ACL_POLICY_METADATA_KEY = "custom:aclPolicy";
@@ -134,6 +134,22 @@ export async function setObjectAclPolicyS3(
     throw new Error(`Object not found: ${objectFile.key}`);
   }
 
+  // If visibility is public, set S3 object ACL to public-read
+  if (aclPolicy.visibility === "public") {
+    try {
+      const putAclCommand = new PutObjectAclCommand({
+        Bucket: objectFile.bucket,
+        Key: objectFile.key,
+        ACL: "public-read",
+      });
+      await s3Client.send(putAclCommand);
+      console.log(`Set object ${objectFile.key} to public-read`);
+    } catch (error: any) {
+      console.error("Error setting S3 object ACL to public-read:", error);
+      // Continue even if ACL setting fails
+    }
+  }
+
   // Get current metadata
   const currentMetadata = await objectFile.getMetadata();
   
@@ -150,6 +166,7 @@ export async function setObjectAclPolicyS3(
     Key: objectFile.key,
     Metadata: updatedMetadata,
     MetadataDirective: "REPLACE",
+    ACL: aclPolicy.visibility === "public" ? "public-read" : "private",
   });
 
   await s3Client.send(copyCommand);

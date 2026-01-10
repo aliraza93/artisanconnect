@@ -257,6 +257,7 @@ export class ObjectStorageService {
     const command = new PutObjectCommand({
       Bucket: bucket,
       Key: key,
+      ACL: "public-read", // Set ACL to public-read during upload
     });
 
     const uploadURL = await getSignedUrl(s3Client, command, {
