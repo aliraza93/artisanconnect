@@ -40,6 +40,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [selectedJobForQuotes, setSelectedJobForQuotes] = useState<string | null>(null);
   const [selectedJobForDetails, setSelectedJobForDetails] = useState<string | null>(null);
+  const [selectedJobData, setSelectedJobData] = useState<Job | null>(null);
   
   // Quote submission modal state
   const [showQuoteModal, setShowQuoteModal] = useState(false);
@@ -913,7 +914,17 @@ export default function Dashboard() {
                                         <Button 
                                           variant="outline" 
                                           size="sm"
-                                          onClick={() => setSelectedJobForDetails(job.id)}
+                                          onClick={async () => {
+                                            setSelectedJobForDetails(job.id);
+                                            // Fetch fresh job data to ensure images are up to date
+                                            try {
+                                              const freshJob = await api.getJob(job.id);
+                                              setSelectedJobData(freshJob);
+                                            } catch (error) {
+                                              console.error('Failed to fetch fresh job data:', error);
+                                              setSelectedJobData(job);
+                                            }
+                                          }}
                                           data-testid={`button-view-job-details-${job.id}`}
                                         >
                                           View Details
@@ -933,7 +944,17 @@ export default function Dashboard() {
                                       <Button 
                                         variant="outline" 
                                         size="sm"
-                                        onClick={() => setSelectedJobForQuotes(job.id)}
+                                        onClick={async () => {
+                                          setSelectedJobForQuotes(job.id);
+                                          // Fetch fresh job data to ensure images are up to date
+                                          try {
+                                            const freshJob = await api.getJob(job.id);
+                                            setSelectedJobData(freshJob);
+                                          } catch (error) {
+                                            console.error('Failed to fetch fresh job data:', error);
+                                            setSelectedJobData(job);
+                                          }
+                                        }}
                                         data-testid={`button-view-job-${job.id}`}
                                       >
                                         View
@@ -1315,12 +1336,22 @@ export default function Dashboard() {
       </div>
 
       {/* Job Details Modal (for viewing quotes with artisan info) */}
-      <Dialog open={!!selectedJobForQuotes} onOpenChange={(open) => !open && setSelectedJobForQuotes(null)}>
+      <Dialog open={!!selectedJobForQuotes} onOpenChange={(open) => {
+        if (!open) {
+          setSelectedJobForQuotes(null);
+          setSelectedJobData(null);
+        }
+      }}>
         <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           {selectedJobForQuotes && (() => {
-            const job = jobs.find(j => j.id === selectedJobForQuotes);
+            // Use fresh job data if available, otherwise use cached job
+            const cachedJob = jobs.find(j => j.id === selectedJobForQuotes);
+            const job = selectedJobData && selectedJobData.id === selectedJobForQuotes ? selectedJobData : cachedJob;
             const jobQuotes = quotes[selectedJobForQuotes] || [];
             if (!job) return null;
+            
+            // Debug
+            console.log('Job images:', job.images, 'Job ID:', job.id);
             
             return (
               <>
@@ -1358,19 +1389,26 @@ export default function Dashboard() {
                     )}
                   </div>
                   
-                  {job.images && job.images.length > 0 && (
+                  {job.images && Array.isArray(job.images) && job.images.length > 0 && (
                     <div>
-                      <h4 className="font-medium mb-2">Images</h4>
+                      <h4 className="font-medium mb-2">Images ({job.images.length})</h4>
                       <div className="grid grid-cols-2 gap-4">
-                        {job.images.map((image, index) => (
-                          <div key={index} className="rounded-lg overflow-hidden border">
-                            <img 
-                              src={getImageUrl(image)}
-                              alt={`${job.title} - Image ${index + 1}`}
-                              className="w-full h-48 object-cover"
-                            />
-                          </div>
-                        ))}
+                        {job.images.map((image, index) => {
+                          if (!image) return null;
+                          return (
+                            <div key={index} className="rounded-lg overflow-hidden border">
+                              <img 
+                                src={getImageUrl(image)}
+                                alt={`${job.title} - Image ${index + 1}`}
+                                className="w-full h-48 object-cover"
+                                onError={(e) => {
+                                  console.error('Failed to load image:', image);
+                                  (e.target as HTMLImageElement).style.display = 'none';
+                                }}
+                              />
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
@@ -1531,11 +1569,21 @@ export default function Dashboard() {
       </Dialog>
 
       {/* Job Details Modal for Artisans */}
-      <Dialog open={!!selectedJobForDetails} onOpenChange={(open) => !open && setSelectedJobForDetails(null)}>
+      <Dialog open={!!selectedJobForDetails} onOpenChange={(open) => {
+        if (!open) {
+          setSelectedJobForDetails(null);
+          setSelectedJobData(null);
+        }
+      }}>
         <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           {selectedJobForDetails && (() => {
-            const job = jobs.find(j => j.id === selectedJobForDetails);
+            // Use fresh job data if available, otherwise use cached job
+            const cachedJob = jobs.find(j => j.id === selectedJobForDetails);
+            const job = selectedJobData && selectedJobData.id === selectedJobForDetails ? selectedJobData : cachedJob;
             if (!job) return null;
+            
+            // Debug
+            console.log('Job images (artisan view):', job.images, 'Job ID:', job.id);
             
             return (
               <>
