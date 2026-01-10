@@ -268,6 +268,7 @@ class ApiClient {
     longitude?: number;
     budget?: string;
     needsLogistics?: boolean;
+    images?: string[];
   }): Promise<Job> {
     return this.request<Job>('/jobs', {
       method: 'POST',

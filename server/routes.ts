@@ -507,10 +507,11 @@ export async function registerRoutes(
       const validatedData = insertJobSchema.parse({
         ...req.body,
         clientId: user.id,
+        images: req.body.images || [],
       });
       
       const job = await storage.createJob(validatedData);
-      console.log('Job created successfully:', job.id);
+      console.log('Job created successfully:', job.id, 'with images:', job.images?.length || 0);
       res.status(201).json(job);
     } catch (error: any) {
       console.error('Job creation error:', error);

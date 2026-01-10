@@ -77,6 +77,7 @@ export default function PostJob() {
     setIsSubmitting(true);
     
     try {
+      // Create job with images included
       const job = await api.createJob({
         title: formData.title,
         description: formData.description,
@@ -87,21 +88,8 @@ export default function PostJob() {
         longitude: formData.longitude !== null ? String(formData.longitude) : undefined,
         budget: formData.budget || undefined,
         needsLogistics: formData.needsLogistics,
+        images: uploadedImages.length > 0 ? uploadedImages : undefined,
       });
-
-      // Add uploaded images to the job
-      for (const imageURL of uploadedImages) {
-        try {
-          await fetch(`/api/jobs/${job.id}/images`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ imageURL }),
-          });
-        } catch (imgError) {
-          console.error('Failed to add image to job:', imgError);
-        }
-      }
 
       toast({
         title: "Job Posted Successfully!",

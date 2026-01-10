@@ -117,19 +117,7 @@ export function SimpleImageUploader({
             throw new Error('Failed to upload file');
           }
 
-          // Set ACL to public and get S3 URL
-          try {
-            await fetch('/api/objects/set-public', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              credentials: 'include',
-              body: JSON.stringify({ objectPath }),
-            });
-          } catch (aclError) {
-            console.warn('Failed to set public ACL:', aclError);
-          }
-
-          // Store the S3 URL returned from server
+          // Store the S3 URL returned from server (ACL is already set to public-read during upload)
           if (s3URL) {
             uploadedURLs.push(s3URL);
           } else {
