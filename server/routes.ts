@@ -1467,14 +1467,30 @@ export async function registerRoutes(
       const { ObjectStorageService } = await import('./objectStorage');
       const objectStorageService = new ObjectStorageService();
       
+      // Normalize the path first
+      const normalizedPath = objectStorageService.normalizeObjectEntityPath(imageURL);
+      
       // Set ACL policy - public so artisans can view
-      const objectPath = await objectStorageService.trySetObjectEntityAclPolicy(
-        imageURL,
-        {
-          owner: user.id,
-          visibility: "public",
-        }
-      );
+      let objectPath: string = normalizedPath;
+      try {
+        objectPath = await objectStorageService.trySetObjectEntityAclPolicy(
+          imageURL,
+          {
+            owner: user.id,
+            visibility: "public",
+          }
+        );
+      } catch (aclError: any) {
+        console.error("Error setting ACL policy for image:", aclError);
+        console.error("ACL error details:", {
+          imageURL,
+          normalizedPath,
+          error: aclError.message || aclError.toString(),
+        });
+        // If ACL setting fails, use the normalized path anyway
+        // The image was uploaded successfully, so we should still save the reference
+        console.warn("Using normalized path without ACL update:", normalizedPath);
+      }
 
       // Add image to job's images array
       const currentImages = job.images || [];
@@ -1487,9 +1503,10 @@ export async function registerRoutes(
         objectPath,
         images: updatedImages
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error adding job image:", error);
-      res.status(500).json({ error: "Failed to add image" });
+      const errorMessage = error?.message || "Failed to add image";
+      res.status(500).json({ error: errorMessage });
     }
   });
 

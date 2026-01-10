@@ -92,12 +92,18 @@ export default function PostJob() {
       // Add uploaded images to the job
       for (const imageURL of uploadedImages) {
         try {
-          await fetch(`/api/jobs/${job.id}/images`, {
+          const response = await fetch(`/api/jobs/${job.id}/images`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
             body: JSON.stringify({ imageURL }),
           });
+          
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+            console.error('Failed to add image to job:', errorData.error || response.statusText);
+            // Continue with other images even if one fails
+          }
         } catch (imgError) {
           console.error('Failed to add image to job:', imgError);
         }
