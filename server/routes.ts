@@ -504,13 +504,29 @@ export async function registerRoutes(
     try {
       const user = req.user as User;
       console.log('Creating job for user:', user.id, 'with data:', req.body);
+      
+      // Process images if provided
+      let processedImages: string[] | undefined = undefined;
+      if (req.body.images && Array.isArray(req.body.images) && req.body.images.length > 0) {
+        const { ObjectStorageService } = await import('./objectStorage');
+        const objectStorageService = new ObjectStorageService();
+        
+        // Normalize all image paths
+        processedImages = req.body.images.map((img: string) => {
+          return objectStorageService.normalizeObjectEntityPath(img);
+        });
+        
+        console.log('Processing images for job creation:', processedImages);
+      }
+      
       const validatedData = insertJobSchema.parse({
         ...req.body,
         clientId: user.id,
+        images: processedImages || req.body.images || [],
       });
       
       const job = await storage.createJob(validatedData);
-      console.log('Job created successfully:', job.id);
+      console.log('Job created successfully:', job.id, 'with images:', job.images);
       res.status(201).json(job);
     } catch (error: any) {
       console.error('Job creation error:', error);
