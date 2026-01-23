@@ -6,13 +6,18 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { MapPin, Search, X, Briefcase } from "lucide-react";
-import { api, type Job } from "@/lib/api";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import { MapPin, Search, X, Briefcase, CheckCircle } from "lucide-react";
+import { api, type Job, type Quote } from "@/lib/api";
 import { useLocation } from "wouter";
 import { useSEO } from "@/hooks/use-seo";
 import { useDebounce } from "@/hooks/use-debounce";
 import { useAuth } from "@/lib/auth-context";
 import { LoginModal } from "@/components/auth/login-modal";
+import { useToast } from "@/hooks/use-toast";
 
 const CATEGORIES = [
   { value: "all", label: "All Categories" },
@@ -31,14 +36,38 @@ const CATEGORIES = [
   { value: "general", label: "General Handyman" },
 ];
 
+function getStatusBadge(status: Job['status']) {
+  const badges = {
+    open: <Badge variant="outline" className="bg-green-50 text-green-700 border-green-100">Open</Badge>,
+    quoted: <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-100">Quoted</Badge>,
+    in_progress: <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-100">In Progress</Badge>,
+    completed: <Badge variant="outline" className="bg-slate-50 text-slate-700 border-slate-100">Completed</Badge>,
+    cancelled: <Badge variant="outline" className="bg-red-50 text-red-700 border-red-100">Cancelled</Badge>,
+    disputed: <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-100">Disputed</Badge>,
+  };
+  return badges[status] || null;
+}
+
 export default function FindWork() {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
+  const { toast } = useToast();
   const [jobs, setJobs] = useState<Job[]>([]);
+  const [quotes, setQuotes] = useState<{[jobId: string]: Quote[]}>({});
   const [loading, setLoading] = useState(true);
   const [category, setCategory] = useState<string>("all");
   const [search, setSearch] = useState<string>("");
   const [showLogin, setShowLogin] = useState(false);
+  const [showQuoteModal, setShowQuoteModal] = useState(false);
+  const [selectedJobForQuote, setSelectedJobForQuote] = useState<Job | null>(null);
+  const [submittingQuote, setSubmittingQuote] = useState(false);
+  const [quoteForm, setQuoteForm] = useState({
+    billingType: 'fixed' as 'fixed' | 'hourly',
+    amount: '',
+    hourlyRate: '',
+    estimatedHours: '',
+    message: '',
+  });
   const debouncedSearch = useDebounce(search, 300);
 
   useSEO({
@@ -59,13 +88,30 @@ export default function FindWork() {
 
       const data = await api.getOpenJobsPublic(Object.keys(filters).length > 0 ? filters : undefined);
       setJobs(data);
+
+      // Fetch quotes for authenticated artisans
+      if (user?.role === 'artisan' && user.verified) {
+        try {
+          const myQuotes = await api.getMyQuotes();
+          const quotesMap: {[jobId: string]: Quote[]} = {};
+          for (const quote of myQuotes) {
+            if (!quotesMap[quote.jobId]) {
+              quotesMap[quote.jobId] = [];
+            }
+            quotesMap[quote.jobId].push(quote);
+          }
+          setQuotes(quotesMap);
+        } catch (error) {
+          console.error("Failed to fetch quotes:", error);
+        }
+      }
     } catch (error) {
       console.error("Failed to fetch jobs:", error);
       setJobs([]);
     } finally {
       setLoading(false);
     }
-  }, [category, debouncedSearch]);
+  }, [category, debouncedSearch, user]);
 
   useEffect(() => {
     fetchJobs();
@@ -100,7 +146,92 @@ export default function FindWork() {
     setLocation(`/job/${jobId}`);
   };
 
-  const handleSubmitQuote = (e: React.MouseEvent, job: Job) => {
+  const openQuoteModal = (job: Job) => {
+    setSelectedJobForQuote(job);
+    setShowQuoteModal(true);
+  };
+
+  const handleSubmitQuote = async () => {
+    if (!user) {
+      setShowLogin(true);
+      return;
+    }
+
+    if (user.role !== 'artisan') {
+      toast({
+        title: "Only artisans can submit quotes",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!selectedJobForQuote) return;
+
+    if (quoteForm.billingType === 'fixed' && !quoteForm.amount) {
+      toast({
+        title: "Please enter an amount",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (quoteForm.billingType === 'hourly' && (!quoteForm.hourlyRate || !quoteForm.estimatedHours)) {
+      toast({
+        title: "Please enter hourly rate and estimated hours",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSubmittingQuote(true);
+    try {
+      await api.createQuote({
+        jobId: selectedJobForQuote.id,
+        billingType: quoteForm.billingType,
+        amount: quoteForm.billingType === 'fixed' ? quoteForm.amount : undefined,
+        hourlyRate: quoteForm.billingType === 'hourly' ? quoteForm.hourlyRate : undefined,
+        estimatedHours: quoteForm.billingType === 'hourly' ? quoteForm.estimatedHours : undefined,
+        message: quoteForm.message || undefined,
+      });
+
+      toast({
+        title: "Quote submitted successfully!",
+        description: "The client will review your quote.",
+      });
+
+      setShowQuoteModal(false);
+      setQuoteForm({
+        billingType: 'fixed',
+        amount: '',
+        hourlyRate: '',
+        estimatedHours: '',
+        message: '',
+      });
+
+      // Refresh quotes
+      if (user?.role === 'artisan') {
+        const myQuotes = await api.getMyQuotes();
+        const quotesMap: {[jobId: string]: Quote[]} = {};
+        for (const quote of myQuotes) {
+          if (!quotesMap[quote.jobId]) {
+            quotesMap[quote.jobId] = [];
+          }
+          quotesMap[quote.jobId].push(quote);
+        }
+        setQuotes(quotesMap);
+      }
+    } catch (error: any) {
+      toast({
+        title: "Failed to submit quote",
+        description: error.message || "Something went wrong. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setSubmittingQuote(false);
+    }
+  };
+
+  const handleQuoteClick = (e: React.MouseEvent, job: Job) => {
     e.stopPropagation();
     if (!user) {
       setShowLogin(true);
@@ -109,8 +240,7 @@ export default function FindWork() {
     if (user.role !== 'artisan') {
       return;
     }
-    // Navigate to job details page where quote submission will be handled
-    setLocation(`/job/${job.id}`);
+    openQuoteModal(job);
   };
 
   const formatDate = (dateString: string) => {
@@ -178,7 +308,7 @@ export default function FindWork() {
                   <CardContent className="p-6">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                       <div className="flex gap-4 flex-1">
-                        <Skeleton className="w-24 h-24 rounded-lg flex-shrink-0" />
+                        <Skeleton className="w-24 h-24 rounded-lg shrink-0" />
                         <div className="flex-1 space-y-2">
                           <Skeleton className="h-6 w-3/4" />
                           <Skeleton className="h-4 w-1/2" />
@@ -215,58 +345,79 @@ export default function FindWork() {
               <div className="space-y-4">
                 {jobs.map((job) => {
                   const firstImage = job.images && job.images.length > 0 ? job.images[0] : null;
+                  const hasQuoted = user?.role === 'artisan' && quotes[job.id]?.some(q => q.artisanId === user.id);
+                  const userQuote = user?.role === 'artisan' ? quotes[job.id]?.find(q => q.artisanId === user.id) : null;
+                  
                   return (
-                    <Card
+                    <div
                       key={job.id}
-                      className="border-none shadow-sm hover:shadow-md transition-shadow cursor-pointer"
-                      onClick={() => handleViewJob(job.id)}
+                      className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-xl hover:bg-slate-50 transition-colors gap-4"
                     >
-                      <CardContent className="p-6">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                          <div className="flex gap-4 flex-1">
-                            {firstImage && (
-                              <div className="w-24 h-24 shrink-0 rounded-lg overflow-hidden border">
-                                <img
-                                  src={firstImage}
-                                  alt={job.title}
-                                  className="w-full h-full object-cover"
-                                  onError={(e) => {
-                                    (e.target as HTMLImageElement).style.display = 'none';
-                                  }}
-                                />
-                              </div>
-                            )}
-                            <div className="space-y-1 flex-1 min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-100">
-                                  {CATEGORIES.find(c => c.value === job.category)?.label || job.category}
-                                </Badge>
-                                <span className="text-xs text-slate-400">{formatDate(job.createdAt)}</span>
-                              </div>
-                              <h3 className="font-bold text-slate-900 text-lg">{job.title}</h3>
-                              <div className="flex items-center gap-2 text-sm text-slate-500">
-                                <MapPin className="w-4 h-4" />
-                                <span>{job.location}</span>
-                              </div>
-                              <p className="text-sm text-slate-600 line-clamp-2 mt-2">{job.description}</p>
-                            </div>
+                      <div className="flex gap-4 flex-1 cursor-pointer" onClick={() => handleViewJob(job.id)}>
+                        {firstImage && (
+                          <div className="w-24 h-24 shrink-0 rounded-lg overflow-hidden border">
+                            <img
+                              src={firstImage}
+                              alt={job.title}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).style.display = 'none';
+                              }}
+                            />
                           </div>
-                          <div className="flex flex-col sm:items-end gap-3">
-                            {job.budget && (
-                              <div className="font-bold text-slate-700 text-lg">R {job.budget}</div>
-                            )}
+                        )}
+                        <div className="space-y-1 flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-100">
+                              {CATEGORIES.find(c => c.value === job.category)?.label || job.category}
+                            </Badge>
+                            {getStatusBadge(job.status)}
+                            <span className="text-xs text-slate-400">{formatDate(job.createdAt)}</span>
+                          </div>
+                          <h3 className="font-bold text-slate-900">{job.title}</h3>
+                          <div className="flex items-center gap-2 text-sm text-slate-500">
+                            <MapPin className="w-4 h-4" />
+                            <span>{job.location}</span>
+                          </div>
+                          <p className="text-sm text-slate-600 line-clamp-2">{job.description}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <div className="text-right">
+                          {job.budget && (
+                            <div className="font-bold text-slate-700">R {job.budget}</div>
+                          )}
+                          {hasQuoted && (
+                            <Badge variant="outline" className="bg-green-50 text-green-700 text-xs mt-1">
+                              <CheckCircle className="w-3 h-3 mr-1 inline" />
+                              Quote Sent
+                            </Badge>
+                          )}
+                          {userQuote && userQuote.status === 'accepted' && (
+                            <Badge variant="outline" className="bg-blue-50 text-blue-700 text-xs mt-1">
+                              Accepted
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleViewJob(job.id)}
+                          >
+                            View Details
+                          </Button>
+                          {user?.role === 'artisan' && !hasQuoted && job.status === 'open' && (
                             <Button
-                              onClick={(e) => handleSubmitQuote(e, job)}
-                              className="bg-secondary hover:bg-secondary/90 w-full sm:w-auto"
-                              disabled={user?.role !== 'artisan'}
+                              onClick={(e) => handleQuoteClick(e, job)}
+                              className="bg-secondary hover:bg-secondary/90"
                             >
-                              <Briefcase className="w-4 h-4 mr-2" />
                               Submit Quote
                             </Button>
-                          </div>
+                          )}
                         </div>
-                      </CardContent>
-                    </Card>
+                      </div>
+                    </div>
                   );
                 })}
               </div>
@@ -274,6 +425,110 @@ export default function FindWork() {
           )}
         </div>
       </div>
+
+      {/* Quote Submission Modal */}
+      <Dialog open={showQuoteModal} onOpenChange={setShowQuoteModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Submit Quote</DialogTitle>
+            <DialogDescription>
+              {selectedJobForQuote?.title}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            {/* Billing Type Toggle */}
+            <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
+              <div>
+                <Label className="text-base font-medium">Pricing Type</Label>
+                <p className="text-sm text-slate-500">
+                  {quoteForm.billingType === 'fixed'
+                    ? 'One fixed price for the entire job'
+                    : 'Charge by the hour based on time worked'
+                  }
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className={`text-sm ${quoteForm.billingType === 'fixed' ? 'font-medium' : 'text-slate-400'}`}>
+                  Fixed
+                </span>
+                <Switch
+                  checked={quoteForm.billingType === 'hourly'}
+                  onCheckedChange={(checked) =>
+                    setQuoteForm({ ...quoteForm, billingType: checked ? 'hourly' : 'fixed' })
+                  }
+                />
+                <span className={`text-sm ${quoteForm.billingType === 'hourly' ? 'font-medium' : 'text-slate-400'}`}>
+                  Hourly
+                </span>
+              </div>
+            </div>
+
+            {quoteForm.billingType === 'fixed' ? (
+              <div className="space-y-2">
+                <Label htmlFor="amount">Total Amount (R)</Label>
+                <Input
+                  id="amount"
+                  type="number"
+                  placeholder="0.00"
+                  value={quoteForm.amount}
+                  onChange={(e) => setQuoteForm({ ...quoteForm, amount: e.target.value })}
+                  className="h-11"
+                />
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="hourlyRate">Hourly Rate (R)</Label>
+                  <Input
+                    id="hourlyRate"
+                    type="number"
+                    placeholder="0.00"
+                    value={quoteForm.hourlyRate}
+                    onChange={(e) => setQuoteForm({ ...quoteForm, hourlyRate: e.target.value })}
+                    className="h-11"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="estimatedHours">Estimated Hours</Label>
+                  <Input
+                    id="estimatedHours"
+                    type="number"
+                    placeholder="0"
+                    value={quoteForm.estimatedHours}
+                    onChange={(e) => setQuoteForm({ ...quoteForm, estimatedHours: e.target.value })}
+                    className="h-11"
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="message">Message (Optional)</Label>
+              <Textarea
+                id="message"
+                placeholder="Add any additional details about your quote..."
+                value={quoteForm.message}
+                onChange={(e) => setQuoteForm({ ...quoteForm, message: e.target.value })}
+                className="min-h-[100px]"
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowQuoteModal(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSubmitQuote}
+              disabled={submittingQuote}
+              className="bg-secondary hover:bg-secondary/90"
+            >
+              {submittingQuote ? "Submitting..." : "Submit Quote"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <LoginModal
         open={showLogin}

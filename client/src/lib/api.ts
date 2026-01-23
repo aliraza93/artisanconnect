@@ -33,6 +33,8 @@ export interface ArtisanProfile {
 
 export interface ArtisanProfileWithUser extends ArtisanProfile {
   userName: string;
+  userRating?: string | null;
+  reviewCount?: number;
 }
 
 export interface Job {

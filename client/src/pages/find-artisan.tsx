@@ -6,11 +6,12 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { MapPin, Search, X } from "lucide-react";
+import { Search, X, MapPin, Star } from "lucide-react";
 import { api, type ArtisanProfileWithUser } from "@/lib/api";
 import { useLocation } from "wouter";
 import { useSEO } from "@/hooks/use-seo";
 import { useDebounce } from "@/hooks/use-debounce";
+import { PlacesAutocomplete } from "@/components/maps/places-autocomplete";
 
 const CATEGORIES = [
   { value: "all", label: "All Categories" },
@@ -140,15 +141,19 @@ export default function FindArtisan() {
                   </Select>
                 </div>
                 <div className="flex-1">
-                  <div className="relative">
-                    <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
-                    <Input
-                      placeholder="Filter by location..."
-                      value={locationFilter}
-                      onChange={(e) => setLocationFilter(e.target.value)}
-                      className="pl-10 h-11"
-                    />
-                  </div>
+                  <PlacesAutocomplete
+                    id="location-filter"
+                    value={locationFilter}
+                    onChange={(address, lat, lng) => {
+                      // Extract location/suburb from address (first part before comma)
+                      const location = address.split(',')[0] || address;
+                      setLocationFilter(location);
+                    }}
+                    placeholder="Filter by location..."
+                    countryRestriction="za"
+                    inputClassName="h-11"
+                    className="space-y-0"
+                  />
                 </div>
                 {hasActiveFilters && (
                   <Button
@@ -228,11 +233,25 @@ export default function FindArtisan() {
                             <span>{artisan.location}</span>
                           </div>
                         )}
-                        {artisan.yearsExperience && (
-                          <div className="text-sm text-slate-600">
-                            {artisan.yearsExperience} years experience
-                          </div>
-                        )}
+                        <div className="flex items-center gap-3 text-sm text-slate-600 flex-wrap">
+                          {artisan.userRating && (
+                            <div className="flex items-center gap-1">
+                              <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+                              <span className="font-medium">
+                                {parseFloat(artisan.userRating).toFixed(1)}
+                              </span>
+                              {artisan.reviewCount !== undefined && artisan.reviewCount > 0 && (
+                                <span className="text-slate-400">({artisan.reviewCount} reviews)</span>
+                              )}
+                            </div>
+                          )}
+                          {artisan.yearsExperience && (
+                            <>
+                              {artisan.userRating && <span className="text-slate-300">|</span>}
+                              <span>{artisan.yearsExperience} years experience</span>
+                            </>
+                          )}
+                        </div>
                         {artisan.bio && (
                           <p className="text-sm text-slate-600 line-clamp-2 mt-2">
                             {artisan.bio}

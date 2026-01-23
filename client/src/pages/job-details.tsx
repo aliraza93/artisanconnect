@@ -9,8 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { MapPin, Briefcase, ArrowLeft, X } from "lucide-react";
-import { api, type Job } from "@/lib/api";
+import { MapPin, Briefcase, ArrowLeft, X, CheckCircle } from "lucide-react";
+import { api, type Job, type Quote } from "@/lib/api";
 import { useRoute, useLocation } from "wouter";
 import { useSEO } from "@/hooks/use-seo";
 import { useAuth } from "@/lib/auth-context";
@@ -53,6 +53,7 @@ export default function JobDetails() {
   const { toast } = useToast();
   const jobId = params?.id;
   const [job, setJob] = useState<Job | null>(null);
+  const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
   const [showQuoteModal, setShowQuoteModal] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
@@ -76,8 +77,17 @@ export default function JobDetails() {
     const fetchJob = async () => {
       setLoading(true);
       try {
-        const jobData = await api.getJob(jobId);
+        const [jobData, quotesData] = await Promise.all([
+          api.getJob(jobId),
+          user?.role === 'artisan' ? api.getMyQuotes().catch(() => []) : Promise.resolve([]),
+        ]);
         setJob(jobData);
+        
+        // Filter quotes for this job
+        if (user?.role === 'artisan') {
+          const jobQuotes = quotesData.filter((q: Quote) => q.jobId === jobId);
+          setQuotes(jobQuotes);
+        }
       } catch (error) {
         console.error("Failed to fetch job:", error);
       } finally {
@@ -86,7 +96,7 @@ export default function JobDetails() {
     };
 
     fetchJob();
-  }, [jobId]);
+  }, [jobId, user]);
 
   const handleSubmitQuote = async () => {
     if (!user) {
@@ -145,9 +155,16 @@ export default function JobDetails() {
         message: '',
       });
 
-      // Refresh job data
-      const updatedJob = await api.getJob(job.id);
+      // Refresh job data and quotes
+      const [updatedJob, myQuotes] = await Promise.all([
+        api.getJob(job.id),
+        user?.role === 'artisan' ? api.getMyQuotes().catch(() => []) : Promise.resolve([]),
+      ]);
       setJob(updatedJob);
+      if (user?.role === 'artisan') {
+        const jobQuotes = myQuotes.filter((q: Quote) => q.jobId === job.id);
+        setQuotes(jobQuotes);
+      }
     } catch (error: any) {
       toast({
         title: "Failed to submit quote",
@@ -201,7 +218,9 @@ export default function JobDetails() {
     );
   }
 
-  const canSubmitQuote = user?.role === 'artisan' && job.status === 'open';
+  const hasQuoted = user?.role === 'artisan' && quotes.some(q => q.artisanId === user.id);
+  const userQuote = user?.role === 'artisan' ? quotes.find(q => q.artisanId === user.id) : null;
+  const canSubmitQuote = user?.role === 'artisan' && job.status === 'open' && !hasQuoted;
 
   return (
     <Layout>
@@ -304,6 +323,55 @@ export default function JobDetails() {
                     height="400px"
                     markerTitle={job.title}
                   />
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Quote Status */}
+            {hasQuoted && userQuote && (
+              <Card className="border-none shadow-sm bg-green-50/50">
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-3 mb-4">
+                    <CheckCircle className="w-6 h-6 text-green-600" />
+                    <div>
+                      <h3 className="font-bold text-slate-900">Quote Submitted</h3>
+                      <p className="text-sm text-slate-600">
+                        Status: <Badge variant="outline" className={
+                          userQuote.status === 'accepted' 
+                            ? 'bg-blue-50 text-blue-700 border-blue-100'
+                            : userQuote.status === 'rejected'
+                            ? 'bg-red-50 text-red-700 border-red-100'
+                            : 'bg-yellow-50 text-yellow-700 border-yellow-100'
+                        }>
+                          {userQuote.status.charAt(0).toUpperCase() + userQuote.status.slice(1)}
+                        </Badge>
+                      </p>
+                    </div>
+                  </div>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-slate-600">Amount:</span>
+                      <span className="font-medium">R {userQuote.amount}</span>
+                    </div>
+                    {userQuote.billingType === 'hourly' && (
+                      <>
+                        <div className="flex justify-between">
+                          <span className="text-slate-600">Hourly Rate:</span>
+                          <span className="font-medium">R {userQuote.hourlyRate}/hr</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-slate-600">Estimated Hours:</span>
+                          <span className="font-medium">{userQuote.estimatedHours} hours</span>
+                        </div>
+                      </>
+                    )}
+                    {userQuote.message && (
+                      <div className="pt-2 border-t">
+                        <span className="text-slate-600">Message:</span>
+                        <p className="text-slate-700 mt-1">{userQuote.message}</p>
+                      </div>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             )}

@@ -61,7 +61,7 @@ export interface IStorage {
   getArtisanProfile(userId: string): Promise<ArtisanProfile | undefined>;
   createArtisanProfile(profile: InsertArtisanProfile): Promise<ArtisanProfile>;
   getArtisansByCategory(category: string): Promise<ArtisanProfile[]>;
-  getAllArtisans(filters?: { category?: string; location?: string; search?: string }): Promise<Array<ArtisanProfile & { userName: string }>>;
+  getAllArtisans(filters?: { category?: string; location?: string; search?: string }): Promise<Array<ArtisanProfile & { userName: string; userRating: string | null; reviewCount: number }>>;
 
   // Jobs
   createJob(job: InsertJob): Promise<Job>;
@@ -170,7 +170,7 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(artisanProfiles).where(eq(artisanProfiles.category, category));
   }
 
-  async getAllArtisans(filters?: { category?: string; location?: string; search?: string }): Promise<Array<ArtisanProfile & { userName: string }>> {
+  async getAllArtisans(filters?: { category?: string; location?: string; search?: string }): Promise<Array<ArtisanProfile & { userName: string; userRating: string | null }>> {
     let query = db
       .select({
         id: artisanProfiles.id,
@@ -187,6 +187,7 @@ export class DatabaseStorage implements IStorage {
         verified: artisanProfiles.verified,
         createdAt: artisanProfiles.createdAt,
         userName: users.fullName,
+        userRating: users.rating,
       })
       .from(artisanProfiles)
       .innerJoin(users, eq(artisanProfiles.userId, users.id));
