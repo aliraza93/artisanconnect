@@ -14,6 +14,10 @@ import Dashboard from "@/pages/dashboard";
 import AdminDashboard from "@/pages/admin/dashboard";
 import About from "@/pages/about";
 import Messages from "@/pages/messages";
+import FindArtisan from "@/pages/find-artisan";
+import FindWork from "@/pages/find-work";
+import ArtisanProfile from "@/pages/artisan-profile";
+import JobDetails from "@/pages/job-details";
 
 function Router() {
   return (
@@ -29,8 +33,10 @@ function Router() {
       <Route path="/about" component={About} />
       <Route path="/privacy" component={About} />
       <Route path="/terms" component={About} />
-      <Route path="/find-artisan" component={() => <Home />} /> 
-      <Route path="/find-work" component={() => <Home />} /> 
+      <Route path="/find-artisan" component={FindArtisan} /> 
+      <Route path="/find-work" component={FindWork} /> 
+      <Route path="/artisan/:userId" component={ArtisanProfile} />
+      <Route path="/job/:id" component={JobDetails} />
       <Route path="/logistics" component={() => <Home />} /> 
       <Route path="/login" component={Dashboard} /> 
       <Route path="/register" component={PostJob} /> 

@@ -519,10 +519,20 @@ export async function registerRoutes(
     }
   });
 
-  // Get all open jobs
-  app.get("/api/jobs/open", isAuthenticated, async (req: Request, res: Response) => {
+  // Get all open jobs (public access with optional filters)
+  app.get("/api/jobs/open", async (req: Request, res: Response) => {
     try {
-      const jobs = await storage.getOpenJobs();
+      const { category, search } = req.query;
+      
+      const filters: { category?: string; search?: string } = {};
+      if (category && typeof category === 'string') {
+        filters.category = category;
+      }
+      if (search && typeof search === 'string') {
+        filters.search = search;
+      }
+      
+      const jobs = await storage.getOpenJobsPublic(Object.keys(filters).length > 0 ? filters : undefined);
       res.json(jobs);
     } catch (error: any) {
       res.status(500).json({ error: "Failed to fetch jobs" });
@@ -901,15 +911,23 @@ export async function registerRoutes(
 
   // ==================== Artisan Routes ====================
   
-  // Get artisans by category
+  // Get artisans with optional filters (category, location, search)
   app.get("/api/artisans", async (req: Request, res: Response) => {
     try {
-      const { category } = req.query;
-      if (!category || typeof category !== 'string') {
-        return res.status(400).json({ error: "Category is required" });
+      const { category, location, search } = req.query;
+      
+      const filters: { category?: string; location?: string; search?: string } = {};
+      if (category && typeof category === 'string') {
+        filters.category = category;
+      }
+      if (location && typeof location === 'string') {
+        filters.location = location;
+      }
+      if (search && typeof search === 'string') {
+        filters.search = search;
       }
       
-      const artisans = await storage.getArtisansByCategory(category);
+      const artisans = await storage.getAllArtisans(Object.keys(filters).length > 0 ? filters : undefined);
       res.json(artisans);
     } catch (error: any) {
       res.status(500).json({ error: "Failed to fetch artisans" });
@@ -923,7 +941,15 @@ export async function registerRoutes(
       if (!profile) {
         return res.status(404).json({ error: "Artisan profile not found" });
       }
-      res.json(profile);
+      
+      // Get user name
+      const user = await storage.getUser(req.params.userId);
+      const profileWithUser = {
+        ...profile,
+        userName: user?.fullName || 'Artisan'
+      };
+      
+      res.json(profileWithUser);
     } catch (error: any) {
       res.status(500).json({ error: "Failed to fetch artisan profile" });
     }

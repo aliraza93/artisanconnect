@@ -40,7 +40,7 @@ import {
   type InsertEmailVerificationToken,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, or, desc } from "drizzle-orm";
+import { eq, and, or, desc, like, ilike, sql } from "drizzle-orm";
 
 export interface QuoteWithArtisan extends Quote {
   artisanName: string;
@@ -61,12 +61,14 @@ export interface IStorage {
   getArtisanProfile(userId: string): Promise<ArtisanProfile | undefined>;
   createArtisanProfile(profile: InsertArtisanProfile): Promise<ArtisanProfile>;
   getArtisansByCategory(category: string): Promise<ArtisanProfile[]>;
+  getAllArtisans(filters?: { category?: string; location?: string; search?: string }): Promise<Array<ArtisanProfile & { userName: string }>>;
 
   // Jobs
   createJob(job: InsertJob): Promise<Job>;
   getJob(id: string): Promise<Job | undefined>;
   getJobsByClient(clientId: string): Promise<Job[]>;
   getOpenJobs(): Promise<Job[]>;
+  getOpenJobsPublic(filters?: { category?: string; search?: string }): Promise<Job[]>;
   updateJob(id: string, updates: Partial<Job>): Promise<Job | undefined>;
 
   // Quotes
@@ -168,6 +170,64 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(artisanProfiles).where(eq(artisanProfiles.category, category));
   }
 
+  async getAllArtisans(filters?: { category?: string; location?: string; search?: string }): Promise<Array<ArtisanProfile & { userName: string }>> {
+    let query = db
+      .select({
+        id: artisanProfiles.id,
+        userId: artisanProfiles.userId,
+        category: artisanProfiles.category,
+        bio: artisanProfiles.bio,
+        skills: artisanProfiles.skills,
+        certifications: artisanProfiles.certifications,
+        yearsExperience: artisanProfiles.yearsExperience,
+        location: artisanProfiles.location,
+        address: artisanProfiles.address,
+        latitude: artisanProfiles.latitude,
+        longitude: artisanProfiles.longitude,
+        verified: artisanProfiles.verified,
+        createdAt: artisanProfiles.createdAt,
+        userName: users.fullName,
+      })
+      .from(artisanProfiles)
+      .innerJoin(users, eq(artisanProfiles.userId, users.id));
+
+    const conditions = [];
+
+    if (filters?.category) {
+      conditions.push(eq(artisanProfiles.category, filters.category));
+    }
+
+    if (filters?.location) {
+      conditions.push(ilike(artisanProfiles.location, `%${filters.location}%`));
+    }
+
+    if (filters?.search) {
+      conditions.push(ilike(users.fullName, `%${filters.search}%`));
+    }
+
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+
+    const results = await query.orderBy(desc(artisanProfiles.createdAt));
+    return results.map((r: any) => ({
+      id: r.id,
+      userId: r.userId,
+      category: r.category,
+      bio: r.bio,
+      skills: r.skills,
+      certifications: r.certifications,
+      yearsExperience: r.yearsExperience,
+      location: r.location,
+      address: r.address,
+      latitude: r.latitude,
+      longitude: r.longitude,
+      verified: r.verified,
+      createdAt: r.createdAt,
+      userName: r.userName,
+    }));
+  }
+
   // Jobs
   async createJob(job: InsertJob): Promise<Job> {
     const [created] = await db.insert(jobs).values(job).returning();
@@ -185,6 +245,26 @@ export class DatabaseStorage implements IStorage {
 
   async getOpenJobs(): Promise<Job[]> {
     return db.select().from(jobs).where(eq(jobs.status, 'open')).orderBy(desc(jobs.createdAt));
+  }
+
+  async getOpenJobsPublic(filters?: { category?: string; search?: string }): Promise<Job[]> {
+    let query = db.select().from(jobs).where(eq(jobs.status, 'open'));
+
+    const conditions = [eq(jobs.status, 'open')];
+
+    if (filters?.category) {
+      conditions.push(eq(jobs.category, filters.category));
+    }
+
+    if (filters?.search) {
+      conditions.push(ilike(jobs.title, `%${filters.search}%`));
+    }
+
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+
+    return query.orderBy(desc(jobs.createdAt));
   }
 
   async updateJob(id: string, updates: Partial<Job>): Promise<Job | undefined> {

@@ -31,6 +31,10 @@ export interface ArtisanProfile {
   createdAt: string;
 }
 
+export interface ArtisanProfileWithUser extends ArtisanProfile {
+  userName: string;
+}
+
 export interface Job {
   id: string;
   clientId: string;
@@ -280,6 +284,14 @@ class ApiClient {
     return this.request<Job[]>('/jobs/open');
   }
 
+  async getOpenJobsPublic(filters?: { category?: string; search?: string }): Promise<Job[]> {
+    const params = new URLSearchParams();
+    if (filters?.category) params.append('category', filters.category);
+    if (filters?.search) params.append('search', filters.search);
+    const queryString = params.toString();
+    return this.request<Job[]>(`/jobs/open${queryString ? `?${queryString}` : ''}`);
+  }
+
   async getMyJobs(): Promise<Job[]> {
     return this.request<Job[]>('/jobs/my-jobs');
   }
@@ -443,8 +455,17 @@ class ApiClient {
     return this.request<ArtisanProfile[]>(`/artisans?category=${encodeURIComponent(category)}`);
   }
 
-  async getArtisanProfile(userId: string): Promise<ArtisanProfile> {
-    return this.request<ArtisanProfile>(`/artisans/${userId}/profile`);
+  async getAllArtisans(filters?: { category?: string; location?: string; search?: string }): Promise<ArtisanProfileWithUser[]> {
+    const params = new URLSearchParams();
+    if (filters?.category) params.append('category', filters.category);
+    if (filters?.location) params.append('location', filters.location);
+    if (filters?.search) params.append('search', filters.search);
+    const queryString = params.toString();
+    return this.request<ArtisanProfileWithUser[]>(`/artisans${queryString ? `?${queryString}` : ''}`);
+  }
+
+  async getArtisanProfile(userId: string): Promise<ArtisanProfile & { userName?: string }> {
+    return this.request<ArtisanProfile & { userName?: string }>(`/artisans/${userId}/profile`);
   }
 
   // Bank Details
