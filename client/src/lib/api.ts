@@ -338,6 +338,29 @@ class ApiClient {
     });
   }
 
+  // Stripe payment flow (accept quote with card)
+  async getStripeConfig(): Promise<{ publishableKey: string }> {
+    return this.request<{ publishableKey: string }>('/stripe/config');
+  }
+
+  async createPaymentIntent(quoteId: string): Promise<{ clientSecret: string; paymentIntentId: string }> {
+    return this.request<{ clientSecret: string; paymentIntentId: string }>('/payments/create-intent', {
+      method: 'POST',
+      body: JSON.stringify({ quoteId }),
+    });
+  }
+
+  async confirmPayment(paymentIntentId: string, quoteId: string): Promise<{
+    success: boolean;
+    payment: Payment;
+    message: string;
+  }> {
+    return this.request<{ success: boolean; payment: Payment; message: string }>('/payments/confirm', {
+      method: 'POST',
+      body: JSON.stringify({ paymentIntentId, quoteId }),
+    });
+  }
+
   // Payments
   async getJobPayments(jobId: string): Promise<Payment[]> {
     return this.request<Payment[]>(`/jobs/${jobId}/payments`);

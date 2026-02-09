@@ -16,12 +16,14 @@ import { useAuth } from "@/lib/auth-context";
 import { api, type Job, type Quote, type Payment } from "@/lib/api";
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
+import { loadStripe } from "@stripe/stripe-js";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { MapView } from "@/components/maps/map-view";
 import { ReviewDialog, StarRating, ArtisanReviewsList } from "@/components/review-dialog";
+import { AcceptQuotePaymentModal } from "@/components/stripe/accept-quote-payment-modal";
 import { useSEO } from "@/hooks/use-seo";
 
 export default function Dashboard() {
@@ -73,6 +75,9 @@ export default function Dashboard() {
     accountType: 'savings',
   });
 
+  // Accept quote with Stripe payment
+  const [quoteToPay, setQuoteToPay] = useState<{ quote: Quote; job: Job | null } | null>(null);
+
   // Email verification state
   const [showVerificationModal, setShowVerificationModal] = useState(false);
   const [verificationOtp, setVerificationOtp] = useState("");
@@ -89,6 +94,40 @@ export default function Dashboard() {
       fetchData();
     }
   }, [user, authLoading]);
+
+  // 3DS return: complete payment and accept quote when Stripe redirects back with payment_intent in URL
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const paymentIntentId = params.get("payment_intent");
+    const clientSecret = params.get("payment_intent_client_secret");
+    if (!paymentIntentId || !clientSecret) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const config = await api.getStripeConfig();
+        if (cancelled || !config.publishableKey) return;
+        const stripe = await loadStripe(config.publishableKey);
+        if (cancelled || !stripe) return;
+        const { paymentIntent } = await stripe.retrievePaymentIntent(clientSecret);
+        if (cancelled || !paymentIntent?.metadata?.quoteId) return;
+        const quoteId = paymentIntent.metadata.quoteId as string;
+        await api.confirmPayment(paymentIntent.id, quoteId);
+        if (cancelled) return;
+        window.history.replaceState({}, "", "/dashboard");
+        toast({
+          title: "Quote accepted",
+          description: "Payment held in escrow. Release when the job is complete.",
+        });
+        fetchData();
+      } catch {
+        // Leave URL as-is so user can retry or see error in console
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const fetchData = async () => {
     setLoading(true);
@@ -1084,13 +1123,17 @@ export default function Dashboard() {
 
                             {user.role === 'client' && (
                               <div className="flex gap-2">
-                                <Button 
-                                  className="flex-1 bg-primary text-sm h-9"
-                                  onClick={() => handleAcceptQuote(quote.id)}
-                                  data-testid={`button-accept-quote-${quote.id}`}
-                                >
-                                  Accept
-                                </Button>
+                                {quote.status === 'pending' ? (
+                                  <Button 
+                                    className="flex-1 bg-primary text-sm h-9"
+                                    onClick={() => setQuoteToPay({ quote, job: jobs.find(j => j.id === quote.jobId) ?? null })}
+                                    data-testid={`button-accept-quote-${quote.id}`}
+                                  >
+                                    Accept
+                                  </Button>
+                                ) : quote.status === 'accepted' ? (
+                                  <Badge className="bg-green-100 text-green-700 text-xs">Accepted</Badge>
+                                ) : null}
                                 <Button variant="outline" className="flex-1 text-sm h-9">
                                   Decline
                                 </Button>
@@ -1487,7 +1530,8 @@ export default function Dashboard() {
                                 <Button 
                                   className="flex-1 bg-primary"
                                   onClick={() => {
-                                    handleAcceptQuote(quote.id);
+                                    const job = jobs.find(j => j.id === quote.jobId) ?? null;
+                                    setQuoteToPay({ quote, job });
                                     setSelectedJobForQuotes(null);
                                   }}
                                   data-testid={`modal-button-accept-quote-${quote.id}`}
@@ -1522,6 +1566,24 @@ export default function Dashboard() {
           })()}
         </DialogContent>
       </Dialog>
+
+      {/* Stripe payment modal (accept quote with card) */}
+      {quoteToPay && (
+        <AcceptQuotePaymentModal
+          quote={quoteToPay.quote}
+          job={quoteToPay.job ?? undefined}
+          userEmail={user?.email}
+          onSuccess={() => {
+            fetchData();
+            setQuoteToPay(null);
+            toast({
+              title: "Quote accepted",
+              description: "Payment held in escrow. Release when the job is complete.",
+            });
+          }}
+          onCancel={() => setQuoteToPay(null)}
+        />
+      )}
 
       {/* Job Details Modal for Artisans */}
       <Dialog open={!!selectedJobForDetails} onOpenChange={(open) => !open && setSelectedJobForDetails(null)}>
