@@ -8,7 +8,7 @@ import passport from "./auth";
 import { pool } from "./db";
 import { setupWebSocket } from "./websocket";
 import { runMigrations } from 'stripe-replit-sync';
-import { getStripeSync } from './stripeClient';
+import { getStripeSync, isUsingStripeEnvKeys } from './stripeClient';
 import { WebhookHandlers } from './webhookHandlers';
 
 const app = express();
@@ -33,8 +33,17 @@ async function initStripe() {
     await runMigrations({ databaseUrl });
     console.log('Stripe schema ready');
 
-    const stripeSync = await getStripeSync();
+    // When using your own Stripe keys (not Replit), skip Replit-managed webhook and sync
+    if (isUsingStripeEnvKeys()) {
+      if (process.env.STRIPE_WEBHOOK_SECRET) {
+        console.log('Using Stripe webhook from Dashboard (STRIPE_WEBHOOK_SECRET). Add endpoint: /api/stripe/webhook');
+      } else {
+        console.log('Stripe env keys set. Optional: set STRIPE_WEBHOOK_SECRET and add webhook in Stripe Dashboard.');
+      }
+      return;
+    }
 
+    const stripeSync = await getStripeSync();
     console.log('Setting up managed webhook...');
     const webhookBaseUrl = `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}`;
     const result = await stripeSync.findOrCreateManagedWebhook(
@@ -45,7 +54,6 @@ async function initStripe() {
     } else {
       console.log('Webhook setup completed');
     }
-
     console.log('Syncing Stripe data...');
     stripeSync.syncBackfill()
       .then(() => console.log('Stripe data synced'))
@@ -55,7 +63,36 @@ async function initStripe() {
   }
 }
 
-// Stripe webhook route - must be BEFORE express.json()
+// Stripe webhook routes - must be BEFORE express.json()
+// 1) Standard webhook (your own Stripe account): POST /api/stripe/webhook + STRIPE_WEBHOOK_SECRET
+const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+if (webhookSecret) {
+  app.post(
+    '/api/stripe/webhook',
+    express.raw({ type: 'application/json' }),
+    async (req, res) => {
+      const signature = req.headers['stripe-signature'];
+      if (!signature) {
+        return res.status(400).json({ error: 'Missing stripe-signature' });
+      }
+      if (!Buffer.isBuffer(req.body)) {
+        return res.status(500).json({ error: 'Webhook processing error' });
+      }
+      try {
+        const { getUncachableStripeClient } = await import('./stripeClient');
+        const stripe = await getUncachableStripeClient();
+        const sig = Array.isArray(signature) ? signature[0] : signature;
+        stripe.webhooks.constructEvent(req.body as Buffer, sig, webhookSecret);
+        res.status(200).json({ received: true });
+      } catch (err: any) {
+        console.error('Stripe webhook verification failed:', err.message);
+        res.status(400).json({ error: 'Webhook processing error' });
+      }
+    }
+  );
+}
+
+// 2) Replit-managed webhook: POST /api/stripe/webhook/:uuid
 app.post(
   '/api/stripe/webhook/:uuid',
   express.raw({ type: 'application/json' }),

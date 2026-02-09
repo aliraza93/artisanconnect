@@ -2,7 +2,20 @@ import Stripe from 'stripe';
 
 let connectionSettings: any;
 
-async function getCredentials() {
+/** Whether Stripe is configured via env vars (your own account) vs Replit Connectors. */
+export function isUsingStripeEnvKeys(): boolean {
+  return !!(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_PUBLISHABLE_KEY);
+}
+
+async function getCredentials(): Promise<{ publishableKey: string; secretKey: string }> {
+  // Prefer your own Stripe account keys (works when not on Replit)
+  const secretKey = process.env.STRIPE_SECRET_KEY;
+  const publishableKey = process.env.STRIPE_PUBLISHABLE_KEY;
+  if (secretKey && publishableKey) {
+    return { publishableKey, secretKey };
+  }
+
+  // Fallback: Replit Connectors (Replit-hosted projects)
   const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
   const xReplitToken = process.env.REPL_IDENTITY
     ? 'repl ' + process.env.REPL_IDENTITY
@@ -11,7 +24,10 @@ async function getCredentials() {
       : null;
 
   if (!xReplitToken) {
-    throw new Error('X_REPLIT_TOKEN not found for repl/depl');
+    throw new Error(
+      'Stripe not configured. Set STRIPE_SECRET_KEY and STRIPE_PUBLISHABLE_KEY in your environment, ' +
+      'or use Replit Connectors when hosted on Replit.'
+    );
   }
 
   const connectorName = 'stripe';
@@ -31,7 +47,6 @@ async function getCredentials() {
   });
 
   const data = await response.json();
-  
   connectionSettings = data.items?.[0];
 
   if (!connectionSettings || (!connectionSettings.settings.publishable || !connectionSettings.settings.secret)) {
