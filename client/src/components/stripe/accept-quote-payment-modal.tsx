@@ -63,6 +63,14 @@ function PaymentFormInner({
     setProcessing(true);
     setError(null);
 
+    // Stripe requires elements.submit() before confirmPayment()
+    const { error: submitError } = await elements.submit();
+    if (submitError) {
+      setError(submitError.message || "Please complete the form");
+      setProcessing(false);
+      return;
+    }
+
     const returnUrl = `${window.location.origin}/dashboard`;
     const { error } = await stripe.confirmPayment({
       elements,

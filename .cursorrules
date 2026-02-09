@@ -1,0 +1,3 @@
+# Git commits
+- Never use the flag `--trailer "Co-authored-by: Cursor <cursoragent@cursor.com>"` (or any Co-authored-by trailer) when running git commit or git commit --amend.
+- Use only `-m "message"` or `-F file` for commit messages. Do not append any trailer.
