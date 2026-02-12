@@ -69,11 +69,6 @@ export function Navbar() {
                 Find Work
               </span>
             </Link>
-            <Link href="/logistics">
-              <span className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors cursor-pointer">
-                Logistics
-              </span>
-            </Link>
           </div>
 
           {/* Desktop Auth Buttons / User Menu */}
@@ -191,11 +186,6 @@ export function Navbar() {
             <Link href="/find-work">
               <div className="block py-2 text-sm font-medium text-foreground hover:text-primary cursor-pointer" onClick={() => setIsOpen(false)}>
                 Find Work
-              </div>
-            </Link>
-            <Link href="/logistics">
-              <div className="block py-2 text-sm font-medium text-foreground hover:text-primary cursor-pointer" onClick={() => setIsOpen(false)}>
-                Logistics
               </div>
             </Link>
 
