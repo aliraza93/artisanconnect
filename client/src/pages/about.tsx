@@ -201,7 +201,7 @@ export default function About() {
                         </ul>
                         <div className="bg-primary/5 p-4 rounded-lg mt-4 flex items-center gap-2">
                           <Mail className="h-5 w-5 text-primary flex-shrink-0" />
-                          <span className="text-slate-700">Requests can be made at: <a href="mailto:admin@artisanconnect.xyz" className="text-primary hover:underline" data-testid="link-privacy-email">admin@artisanconnect.xyz</a></span>
+                          <span className="text-slate-700">Requests can be made at: <a href="mailto:admin@artisanconnect.web.za" className="text-primary hover:underline" data-testid="link-privacy-email">admin@artisanconnect.web.za</a></span>
                         </div>
                       </section>
 
@@ -331,7 +331,7 @@ export default function About() {
                         <h3 className="text-lg font-semibold text-slate-900">10. Contact</h3>
                         <div className="bg-primary/5 p-4 rounded-lg mt-2 flex items-center gap-2">
                           <Mail className="h-5 w-5 text-primary flex-shrink-0" />
-                          <span className="text-slate-700">For any queries, email: <a href="mailto:admin@artisanconnect.xyz" className="text-primary hover:underline" data-testid="link-terms-email">admin@artisanconnect.xyz</a></span>
+                          <span className="text-slate-700">For any queries, email: <a href="mailto:admin@artisanconnect.web.za" className="text-primary hover:underline" data-testid="link-terms-email">admin@artisanconnect.web.za</a></span>
                         </div>
                       </section>
                     </div>

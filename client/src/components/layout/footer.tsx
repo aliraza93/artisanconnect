@@ -36,7 +36,7 @@ export function Footer() {
             <h4 className="font-heading font-semibold text-lg mb-4 text-slate-200">Company</h4>
             <ul className="space-y-2 text-sm text-slate-400">
               <li><a href="/about" className="hover:text-primary transition-colors" data-testid="link-about">About Us</a></li>
-              <li><a href="mailto:admin@artisanconnect.xyz" className="hover:text-primary transition-colors" data-testid="link-contact">Contact</a></li>
+              <li><a href="mailto:admin@artisanconnect.web.za" className="hover:text-primary transition-colors" data-testid="link-contact">Contact</a></li>
               <li><a href="/about?tab=privacy" className="hover:text-primary transition-colors" data-testid="link-privacy">Privacy Policy (POPIA)</a></li>
               <li><a href="/about?tab=terms" className="hover:text-primary transition-colors" data-testid="link-terms">Terms & Conditions</a></li>
             </ul>
@@ -46,7 +46,7 @@ export function Footer() {
           <div>
             <h4 className="font-heading font-semibold text-lg mb-4 text-slate-200">Contact</h4>
             <ul className="space-y-2 text-sm text-slate-400">
-              <li>admin@artisanconnect.xyz</li>
+              <li>admin@artisanconnect.web.za</li>
             </ul>
           </div>
         </div>
